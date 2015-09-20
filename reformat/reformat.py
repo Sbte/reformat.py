@@ -27,23 +27,11 @@ class StringReplacer(object):
     def __repr__(self):
         return self.text
 
-def main():
-    if len(sys.argv) < 2:
-        print 'No filename'
-        return
-
-    fname = sys.argv[1]
-    if not os.path.exists(fname):
-        print fname, 'is not a valid filename'
-
-    f = open(fname, 'r')
-    lines = f.readlines()
-    f.close()
-
-    if not os.path.exists(fname+'.bak'):
-        f = open(fname+'.bak', 'w')
-        f.write(''.join(lines))
-        f.close()
+def reformat(text_in):
+    if isinstance(text_in, basestring):
+        lines = text_in.split('\n')
+    else:
+        lines = text_in
 
     text = ''
     line_type = StringReplacer.Normal
@@ -169,6 +157,28 @@ def main():
 
         line = line.rstrip()
         text += line + '\n'
+
+    return text
+
+def main():
+    if len(sys.argv) < 2:
+        print 'No filename'
+        return
+
+    fname = sys.argv[1]
+    if not os.path.exists(fname):
+        print fname, 'is not a valid filename'
+
+    f = open(fname, 'r')
+    lines = f.readlines()
+    f.close()
+
+    if not os.path.exists(fname+'.bak'):
+        f = open(fname+'.bak', 'w')
+        f.write(''.join(lines))
+        f.close()
+
+    text = reformat(lines)
 
     f = open(fname, 'w')
     f.write(text)
