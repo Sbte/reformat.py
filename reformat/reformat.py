@@ -21,6 +21,13 @@ class StringReplacer(object):
         if self.type == self.Normal or self.type == self.Index:
             self.text = re.sub(search, replace, self.text)
 
+    def repreated_regex_replace(self, search, replace):
+        text = self.text
+        self.regex_replace(search, replace)
+        while text != self.text:
+            text = self.text
+            self.regex_replace(search, replace)
+
     def __str__(self):
         return self.text
 
@@ -127,11 +134,7 @@ def reformat(text_in):
                 line_part.replace(key+'(', key+' (')
 
             # Templates and includes should not have spaces
-            line_part.regex_replace(' < ([\w\.<: ]+) >', '<\g<1>>')
-
-            # Unless nested templates TODO: Fix this for line_part that have both
-            if '> >' in orig_line:
-                line_part.replace('>>', '> >')
+            line_part.repreated_regex_replace(' < ((?:[\w\.<:]|> )+)\s*>\s*', '<\g<1>> ')
 
             # Template members
             line_part.replace('> ::', '>::')
