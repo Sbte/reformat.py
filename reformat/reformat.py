@@ -95,7 +95,7 @@ def reformat(text_in):
                 continue
 
             # Put spaces around operators
-            ops = ['=', '+', '/', '-', '<', '>', '%']
+            ops = ['=', '+', '/', '-', '<', '>', '%', '*']
             for op in ops:
                 line_part.replace(op, ' '+op+' ')
                 line_part.replace('  '+op, ' '+op)
@@ -134,7 +134,7 @@ def reformat(text_in):
                 line_part.replace(key+'(', key+' (')
 
             # Templates and includes should not have spaces
-            line_part.repreated_regex_replace(' < ((?:[\w\.<:]|> )+)\s*>\s*', '<\g<1>> ')
+            line_part.repreated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>\s*', '<\g<1>\g<2>> ')
 
             # Template members
             line_part.replace('> ::', '>::')
@@ -144,6 +144,10 @@ def reformat(text_in):
             for op in ops:
                 if op != '-':
                     line_part.replace(op+'-', op+' -')
+
+            # Pointer casts (int *) and static_cast<int *>()
+            line_part.regex_replace('([\(<])\s*(\w+)\s*\*\s*([\)>])', '\g<1>\g<2> *\g<3>')
+            line_part.regex_replace('([\(<]\w+ \*[\)>]) \(', '\g<1>(')
 
             # Put spaces after , and ;
             for op in [',', ';']:
