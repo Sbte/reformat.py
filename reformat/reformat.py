@@ -158,7 +158,7 @@ def reformat(text_in):
         line = line.rstrip()
         text += line + '\n'
 
-    return text
+    return text.rstrip()
 
 def main():
     if len(sys.argv) < 2:
