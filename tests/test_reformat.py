@@ -74,14 +74,15 @@ def test_multiplication_operator():
     out = reformat.reformat('a*b')
     assert out == 'a * b'
 
+@pytest.mark.xfail
 def test_pointers():
     out = reformat.reformat('(a*)')
     assert out == '(a *)'
     out = reformat.reformat('static_cast<a*>(b)')
     assert out == 'static_cast<a *>(b)'
     out = reformat.reformat('void f(int *c)')
-    #~ assert out == 'void f(int *c)'
+    assert out == 'void f(int *c)'
     out = reformat.reformat('A *f(int *c)')
-    #~ assert out == 'A *f(int *c)'
+    assert out == 'A *f(int *c)'
     out = reformat.reformat('int *a = new int[b];')
-    #~ assert out == 'int *a = new int[b];'
+    assert out == 'int *a = new int[b];'
