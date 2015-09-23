@@ -108,8 +108,6 @@ def reformat(text_in):
             if line_type == StringReplacer.MultilineComment:
                 if line_part.endswith('*/'):
                     line_parts.append(StringReplacer(line_part, line_type))
-                    print line_part
-                    print line_type
                     line_type = StringReplacer.Normal
                     line_part = ''
                     continue
@@ -119,8 +117,6 @@ def reformat(text_in):
             if line_part.endswith('/*'):
                 line_parts.append(StringReplacer(line_part[:-2], line_type))
                 line_type = StringReplacer.MultilineComment
-                print line_part
-                print line_type
                 line_part = '/*'
                 continue
 
