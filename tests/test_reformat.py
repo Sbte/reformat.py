@@ -71,10 +71,15 @@ def test_includes():
     assert out == '#include <iostream>'
 
 def test_multiplication_operator():
-    out = reformat.reformat('a*b')
-    assert out == 'a * b'
+    out = reformat.reformat('{a = b * c;}')
+    assert out == '{a = b * c; }'
+    out = reformat.reformat('{f(a * b);}')
+    assert out == '{f(a * b); }'
+    out = reformat.reformat('std::cout<<a*b;')
+    assert out == 'std::cout << a * b;'
+    out = reformat.reformat('{if (a*b)}')
+    assert out == '{if (a * b)}'
 
-@pytest.mark.xfail
 def test_pointers():
     out = reformat.reformat('(a*)')
     assert out == '(a *)'
@@ -86,3 +91,27 @@ def test_pointers():
     assert out == 'A *f(int *c)'
     out = reformat.reformat('int *a = new int[b];')
     assert out == 'int *a = new int[b];'
+    out = reformat.reformat('int *a;')
+    assert out == 'int *a;'
+    out = reformat.reformat('f(*a,*b)')
+    assert out == 'f(*a, *b)'
+
+def test_brackets():
+    out = reformat.reformat('( a )')
+    assert out == '(a)'
+
+def test_multiline_comments():
+    code = '''/*
+s*v)23a87+v"asd{"
+*/'''
+    out = reformat.reformat(code)
+    assert out == code
+
+@pytest.mark.xfail
+def test_pointers_that_are_not_pointers():
+    '''This is something that also doesn't work in astyle'''
+    code = '''int a = 1;
+int b = 2;
+int c(a * b);'''
+    out = reformat.reformat(code)
+    assert out == code
