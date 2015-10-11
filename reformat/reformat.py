@@ -9,10 +9,14 @@ class StringReplacer(object):
     MultilineComment = 3
     Index = 4
 
-    def __init__(self, text, type, scope = 0):
+    def __init__(self, text, type, scope = None):
         self.text = text
         self.type = type
-        self.scope = scope
+
+        if scope:
+            self.scope = list(scope)
+        else:
+            self.scope = []
 
     def replace(self, search, replace):
         if self.type == self.Normal or self.type == self.Index:
@@ -40,7 +44,12 @@ class StringReplacer(object):
         self.regex_replace('(\W+) \*\s*(\w+)', '\g<1> *\g<2>')
 
         # Pointers in function definitions and the global scope
-        if self.scope == 0:
+        global_scope = True
+        for s in self.scope:
+            if s not in ('namespace', 'struct', 'class'):
+                global_scope = False
+                break
+        if global_scope:
             self.repeated_regex_replace('^([^=\+-/%]+)\* ', '\g<1>*')
 
         # lvalue pointers, up to any operator or bracket
@@ -68,25 +77,39 @@ class StringReplacer(object):
 
 def set_scopes(line_parts):
     new_line_parts = []
-    scope = 0
+    scope = []
+    scope_keyword = ''
     for line_part in line_parts:
         if line_part.type == StringReplacer.Normal:
             new_line_part = ''
             for char in line_part.text:
                 if char == '{':
                     new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
-                    scope += 1
+                    scope.append(scope_keyword)
+                    scope_keyword = ''
                     new_line_part = ''
-                if char == '}':
+                elif char == '}':
                     new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
-                    scope -= 1
+                    scope.pop()
+                    scope_keyword = ''
                     new_line_part = ''
+                elif scope_keyword and char == ';':
+                    scope_keyword = ''
+
                 new_line_part += char
+
+                for keyword in ('namespace', 'class', 'struct'):
+                    if re.match('^\W*'+keyword+'\W$', new_line_part):
+                        scope_keyword = keyword
             if new_line_part:
                 new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
         else:
-            line_part.scope = scope
+            line_part.scope = list(scope)
             new_line_parts.append(line_part)
+
+    # All scopes should be closed at the end of the file
+    assert scope == []
+
     return new_line_parts
 
 def reformat(text_in):
@@ -146,7 +169,7 @@ def reformat(text_in):
 
         line_parts.append(StringReplacer(line_part, line_type))
 
-        line_parts = set_scopes(line_parts)
+    line_parts = set_scopes(line_parts)
 
     text = ''
     for line_part in line_parts:

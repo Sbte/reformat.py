@@ -96,6 +96,24 @@ def test_pointers():
     out = reformat.reformat('f(*a,*b)')
     assert out == 'f(*a, *b)'
 
+def test_classes():
+    out = reformat.reformat('class A { int *f(int *a);};')
+    assert out == 'class A { int *f(int *a); };'
+    out = reformat.reformat('class A; void f(a*b);')
+    assert out == 'class A; void f(a *b);'
+    out = reformat.reformat('class A; {f(a*b);}')
+    assert out == 'class A; {f(a * b); }'
+
+def test_namespace():
+    code = '''namespace A {
+    void f(int *a)
+    {
+        g(a * b);
+    }
+}'''
+    out = reformat.reformat(code)
+    assert out == code
+
 def test_brackets():
     out = reformat.reformat('( a )')
     assert out == '(a)'
