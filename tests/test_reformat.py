@@ -70,6 +70,10 @@ def test_includes():
     out = reformat.reformat('#include <iostream>')
     assert out == '#include <iostream>'
 
+def test_includes():
+    out = reformat.reformat('#include <iostream> \n#include <string>')
+    assert out == '#include <iostream>\n#include <string>'
+
 def test_multiplication_operator():
     out = reformat.reformat('{a = b * c;}')
     assert out == '{a = b * c; }'

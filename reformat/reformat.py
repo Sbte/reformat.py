@@ -217,7 +217,7 @@ def reformat(text_in):
             line_part.replace(key+'(', key+' (')
 
         # Templates and includes should not have spaces
-        line_part.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>\s*', '<\g<1>\g<2>> ')
+        line_part.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>[ \t]*', '<\g<1>\g<2>> ')
 
         # Template members
         line_part.replace('> ::', '>::')
