@@ -84,6 +84,16 @@ def test_multiplication_operator():
     out = reformat.reformat('{if (a*b)}')
     assert out == '{if (a * b)}'
 
+def test_and_operator():
+    out = reformat.reformat('{a = b & c;}')
+    assert out == '{a = b & c; }'
+    out = reformat.reformat('{f(a & b);}')
+    assert out == '{f(a & b); }'
+    out = reformat.reformat('std::cout<<a&b;')
+    assert out == 'std::cout << a & b;'
+    out = reformat.reformat('{if (a&b)}')
+    assert out == '{if (a & b)}'
+
 def test_pointers():
     out = reformat.reformat('(a*)')
     assert out == '(a *)'
@@ -99,6 +109,16 @@ def test_pointers():
     assert out == 'int *a;'
     out = reformat.reformat('f(*a,*b)')
     assert out == 'f(*a, *b)'
+
+def test_references():
+    out = reformat.reformat('void f(int &c)')
+    assert out == 'void f(int &c)'
+    out = reformat.reformat('A &f(int &c)')
+    assert out == 'A &f(int &c)'
+    out = reformat.reformat('int &a = f[b];')
+    assert out == 'int &a = f[b];'
+    out = reformat.reformat('f(&a,&b)')
+    assert out == 'f(&a, &b)'
 
 def test_classes():
     out = reformat.reformat('class A { int *f(int *a);};')

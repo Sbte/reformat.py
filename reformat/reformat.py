@@ -33,15 +33,16 @@ class StringReplacer(object):
             text = self.text
             self.regex_replace(search, replace)
 
-    def handle_pointers(self):
+    def handle_pointers(self, pointer_type='*'):
         '''Handles pointers in C-type languages'''
+        escaped_pointer_type = re.escape(pointer_type)
 
         # Pointer casts (int *) and static_cast<int *>()
-        self.regex_replace('([\(<])\s*(\w+)\s*\*\s*([\)>])', '\g<1>\g<2> *\g<3>')
-        self.regex_replace('([\(<]\w+ \*[\)>]) \(', '\g<1>(')
+        self.regex_replace('([\(<])\s*(\w+)\s*'+escaped_pointer_type+'\s*([\)>])', '\g<1>\g<2> '+pointer_type+'\g<3>')
+        self.regex_replace('([\(<]\w+ '+escaped_pointer_type+'[\)>]) \(', '\g<1>(')
 
         # Pointers as function argument etc, like f(a, *b)
-        self.regex_replace('(\W+) \*\s*(\w+)', '\g<1> *\g<2>')
+        self.regex_replace('(\W+) '+escaped_pointer_type+'\s*(\w+)', '\g<1> '+pointer_type+'\g<2>')
 
         # Pointers in function definitions and the global scope
         global_scope = True
@@ -50,15 +51,15 @@ class StringReplacer(object):
                 global_scope = False
                 break
         if global_scope:
-            self.repeated_regex_replace('^([^=\+-/%]+)\* ', '\g<1>*')
+            self.repeated_regex_replace('^([^=\+-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
-        self.repeated_regex_replace('^([^=\+-/%\(]+)\* ', '\g<1>*')
+        self.repeated_regex_replace('^([^=\+-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # Put back spaces when an operator with more than 1 char was before
         # the *
-        self.repeated_regex_replace('(>>.*) \*([^ ])', '\g<1> * \g<2>')
-        self.repeated_regex_replace('(<<.*) \*([^ ])', '\g<1> * \g<2>')
+        self.repeated_regex_replace('(>>.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
+        self.repeated_regex_replace('(<<.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
 
     def handle_brackets(self):
         '''Don't allow spaces before and after brackets'''
@@ -178,7 +179,7 @@ def reformat(text_in):
             continue
 
         # Put spaces around operators
-        ops = ['=', '+', '/', '-', '<', '>', '%', '*']
+        ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&']
         for op in ops:
             line_part.replace(op, ' '+op+' ')
             line_part.replace('  '+op, ' '+op)
@@ -228,7 +229,8 @@ def reformat(text_in):
             if op != '-':
                 line_part.replace(op+'-', op+' -')
 
-        line_part.handle_pointers()
+        line_part.handle_pointers('*')
+        line_part.handle_pointers('&')
 
         # Put spaces after , and ;
         for op in [',', ';']:
