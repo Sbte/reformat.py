@@ -109,6 +109,8 @@ def test_pointers():
     assert out == 'int *a;'
     out = reformat.reformat('f(*a,*b)')
     assert out == 'f(*a, *b)'
+    out = reformat.reformat('A *f(int *a, int *b)')
+    assert out == 'A *f(int *a, int *b)'
 
 def test_references():
     out = reformat.reformat('void f(int &c)')
@@ -146,6 +148,15 @@ def test_multiline_comments():
     code = '''/*
 s*v)23a87+v"asd{"
 */'''
+    out = reformat.reformat(code)
+    assert out == code
+
+def test_initializer_lists():
+    code = '''A::A(int &a, int &b)
+:
+    a_(a * b)
+{}
+'''
     out = reformat.reformat(code)
     assert out == code
 

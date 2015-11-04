@@ -2,12 +2,19 @@ import sys
 import os
 import re
 
+def is_global_scope(scope):
+    for s in scope:
+        if s not in ('namespace', 'struct', 'class'):
+            return False
+    return True
+
 class StringReplacer(object):
     Normal = 0
     String = 1
     Comment = 2
     MultilineComment = 3
     Index = 4
+    InitializerList = 5
 
     def __init__(self, text, type, scope = None):
         self.text = text
@@ -19,11 +26,11 @@ class StringReplacer(object):
             self.scope = []
 
     def replace(self, search, replace):
-        if self.type == self.Normal or self.type == self.Index:
+        if self.type in [self.Normal, self.Index, self.InitializerList]:
             self.text = self.text.replace(search, replace)
 
     def regex_replace(self, search, replace):
-        if self.type == self.Normal or self.type == self.Index:
+        if self.type in [self.Normal, self.Index, self.InitializerList]:
             self.text = re.sub(search, replace, self.text)
 
     def repeated_regex_replace(self, search, replace):
@@ -32,6 +39,9 @@ class StringReplacer(object):
         while text != self.text:
             text = self.text
             self.regex_replace(search, replace)
+
+    def is_global_scope(self):
+        return is_global_scope(self.scope)
 
     def handle_pointers(self, pointer_type='*'):
         '''Handles pointers in C-type languages'''
@@ -45,12 +55,7 @@ class StringReplacer(object):
         self.regex_replace('(\W+) '+escaped_pointer_type+'\s*(\w+)', '\g<1> '+pointer_type+'\g<2>')
 
         # Pointers in function definitions and the global scope
-        global_scope = True
-        for s in self.scope:
-            if s not in ('namespace', 'struct', 'class'):
-                global_scope = False
-                break
-        if global_scope:
+        if self.is_global_scope():
             self.repeated_regex_replace('^([^=\+-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
@@ -76,6 +81,13 @@ class StringReplacer(object):
     def __repr__(self):
         str(self)
 
+def is_normal_line_type(line_type):
+    normal_types = [StringReplacer.Normal, StringReplacer.InitializerList]
+    if isinstance(line_type, list):
+        return line_type[-1] in normal_types
+    else:
+        return line_type in normal_types
+
 def set_scopes(line_parts):
     new_line_parts = []
     scope = []
@@ -85,6 +97,11 @@ def set_scopes(line_parts):
             new_line_part = ''
             for char in line_part.text:
                 if char == '{':
+                    if scope_keyword == 'initializer list':
+                        # We added a : scope that we need to remove first
+                        scope.pop()
+                        scope_keyword = ''
+
                     new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
                     scope.append(scope_keyword)
                     scope_keyword = ''
@@ -104,6 +121,12 @@ def set_scopes(line_parts):
                         scope_keyword = keyword
             if new_line_part:
                 new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+        elif line_part.type == StringReplacer.InitializerList and is_global_scope(scope):
+            scope.append('initializer list')
+            scope_keyword = 'initializer list'
+            new_line_part = ''
+            line_part.scope = list(scope)
+            new_line_parts.append(line_part)
         else:
             line_part.scope = list(scope)
             new_line_parts.append(line_part)
@@ -119,62 +142,92 @@ def reformat(text_in):
     else:
         lines = text_in
 
-    line_type = StringReplacer.Normal
+    line_type = [StringReplacer.Normal]
 
     line_parts = []
     for line_num, line in enumerate(lines):
         orig_line = line
         line_part = ''
-        line_type = line_type if line_type == StringReplacer.MultilineComment else StringReplacer.Normal
+        if line_type[-1] == StringReplacer.Comment:
+            line_type.pop()
+
         for pos, char in enumerate(orig_line):
             line_part += char
 
-            if line_type == StringReplacer.MultilineComment:
+            if line_type[-1] == StringReplacer.MultilineComment:
                 if line_part.endswith('*/'):
-                    line_parts.append(StringReplacer(line_part, line_type))
-                    line_type = StringReplacer.Normal
+                    line_parts.append(StringReplacer(line_part, line_type.pop()))
                     line_part = ''
                     continue
                 else:
                     continue
 
             if line_part.endswith('/*'):
-                line_parts.append(StringReplacer(line_part[:-2], line_type))
-                line_type = StringReplacer.MultilineComment
+                line_parts.append(StringReplacer(line_part[:-2], line_type[-1]))
+                line_type.append(StringReplacer.MultilineComment)
                 line_part = '/*'
                 continue
 
             if char == '"':
-                line_parts.append(StringReplacer(line_part, line_type))
-                line_type = StringReplacer.Normal if line_type == StringReplacer.String else StringReplacer.String
+                if line_type[-1] == StringReplacer.String:
+                    line_parts.append(StringReplacer(line_part, line_type.pop()))
+                else:
+                    line_parts.append(StringReplacer(line_part, line_type[-1]))
+                    line_type.append(StringReplacer.String)
                 line_part = ''
                 continue
 
             if line_part.endswith('//'):
-                line_parts.append(StringReplacer(line_part[:-2], line_type))
-                line_type = StringReplacer.Comment
+                line_parts.append(StringReplacer(line_part[:-2], line_type[-1]))
+                line_type.append(StringReplacer.Comment)
                 line_part = orig_line[pos-1:]
                 break
 
-            if line_part.endswith('[') and line_type == StringReplacer.Normal:
-                line_parts.append(StringReplacer(line_part[:-1], line_type))
-                line_type = StringReplacer.Index
+            if line_part.endswith('[') and is_normal_line_type(line_type):
+                line_parts.append(StringReplacer(line_part[:-1], line_type[-1]))
+                line_type.append(StringReplacer.Index)
                 line_part = '['
                 continue
 
-            if line_part.endswith(']') and line_type == StringReplacer.Index:
-                line_parts.append(StringReplacer(line_part, line_type))
-                line_type = StringReplacer.Normal
+            if line_part.endswith(']') and line_type[-1] == StringReplacer.Index:
+                line_parts.append(StringReplacer(line_part, line_type.pop()))
                 line_part = ''
                 continue
 
-        line_parts.append(StringReplacer(line_part, line_type))
+            if line_part.endswith('::') and line_type[-1] == StringReplacer.InitializerList:
+                line_part = line_parts.pop()
+                line_part = line_part.text + '::'
+                line_type.pop()
+                continue
+
+            if line_part.endswith(':') and is_normal_line_type(line_type):
+                line_parts.append(StringReplacer(line_part[:-1], line_type[-1]))
+                line_type.append(StringReplacer.InitializerList)
+                line_part = ':'
+                continue
+
+            if line_part.endswith(';') and line_type[-1] == StringReplacer.InitializerList:
+                line_type.pop()
+                line_parts.append(StringReplacer(line_part, line_type[-1]))
+                line_part = ''
+                continue
+
+            if line_part.endswith('{') and line_type[-1] == StringReplacer.InitializerList:
+                line_parts.append(StringReplacer(line_part[:-1], line_type.pop()))
+                line_part = '{'
+                continue
+
+        line_parts.append(StringReplacer(line_part, line_type[-1]))
+
+    # Check that we popped all other line_types
+    # assert line_type == [StringReplacer.Normal]
 
     line_parts = set_scopes(line_parts)
 
     text = ''
     for line_part in line_parts:
-        if line_part.type not in [StringReplacer.Normal, StringReplacer.Index]:
+        if line_part.type not in [StringReplacer.Normal, StringReplacer.Index,
+                                  StringReplacer.InitializerList]:
             text += str(line_part)
             continue
 
