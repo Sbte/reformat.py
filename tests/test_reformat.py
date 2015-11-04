@@ -155,8 +155,7 @@ def test_initializer_lists():
     code = '''A::A(int &a, int &b)
 :
     a_(a * b)
-{}
-'''
+{}'''
     out = reformat.reformat(code)
     assert out == code
 

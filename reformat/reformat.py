@@ -56,10 +56,10 @@ class StringReplacer(object):
 
         # Pointers in function definitions and the global scope
         if self.is_global_scope():
-            self.repeated_regex_replace('^([^=\+-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
+            self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
-        self.repeated_regex_replace('^([^=\+-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
+        self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # Put back spaces when an operator with more than 1 char was before
         # the *
