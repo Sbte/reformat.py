@@ -66,11 +66,22 @@ class StringReplacer(object):
         self.repeated_regex_replace('(>>.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
         self.repeated_regex_replace('(<<.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
 
+    def handle_templates(self):
+        '''Handle C++ templates'''
+        # Templates and includes should not have spaces
+        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>[ \t]*', '<\g<1>\g<2>> ')
+
+        # Template members
+        self.replace('> ::', '>::')
+
+        # No space before a bracket
+        self.repeated_regex_replace('<((?:[\w\.<>:\*& ])+?)((?:> )*)> \(', '<\g<1>\g<2>>(')
+
     def handle_brackets(self):
         '''Don't allow spaces before and after brackets'''
 
-        self.replace('( ', '(')
-        self.replace(' )', ')')
+        self.regex_replace('( ', '(')
+        self.regex_replace(' )', ')')
 
     def __str__(self):
         if self.text.endswith('\n'):
@@ -283,11 +294,7 @@ def reformat(text_in, base_scope=None):
         for key in ['for', 'if']:
             line_part.replace(key+'(', key+' (')
 
-        # Templates and includes should not have spaces
-        line_part.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>[ \t]*', '<\g<1>\g<2>> ')
-
-        # Template members
-        line_part.replace('> ::', '>::')
+        line_part.handle_templates()
 
         # -1 should not have spaces
         line_part.regex_replace('([^\w\]\)]) - ', '\g<1>-')
