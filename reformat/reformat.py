@@ -88,9 +88,16 @@ def is_normal_line_type(line_type):
     else:
         return line_type in normal_types
 
-def set_scopes(line_parts):
+def set_scopes(line_parts, base_scope):
     new_line_parts = []
+
     scope = []
+    if base_scope:
+        if isinstance(base_scope, list):
+            scope = base_scope
+        else:
+            scope = [base_scope]
+
     scope_keyword = ''
     for line_part in line_parts:
         if line_part.type == StringReplacer.Normal:
@@ -132,11 +139,17 @@ def set_scopes(line_parts):
             new_line_parts.append(line_part)
 
     # All scopes should be closed at the end of the file
-    assert scope == []
+    if base_scope:
+        if isinstance(base_scope, list):
+            assert scope == base_scope
+        else:
+            assert scope == [base_scope]
+    else:
+        assert scope == []
 
     return new_line_parts
 
-def reformat(text_in):
+def reformat(text_in, base_scope=None):
     if isinstance(text_in, basestring):
         lines = text_in.splitlines(True)
     else:
@@ -222,7 +235,7 @@ def reformat(text_in):
     # Check that we popped all other line_types
     # assert line_type == [StringReplacer.Normal]
 
-    line_parts = set_scopes(line_parts)
+    line_parts = set_scopes(line_parts, base_scope)
 
     text = ''
     for line_part in line_parts:

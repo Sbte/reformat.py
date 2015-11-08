@@ -75,24 +75,24 @@ def test_includes():
     assert out == '#include <iostream>\n#include <string>'
 
 def test_multiplication_operator():
-    out = reformat.reformat('{a = b * c;}')
-    assert out == '{a = b * c; }'
-    out = reformat.reformat('{f(a * b);}')
-    assert out == '{f(a * b); }'
+    out = reformat.reformat('a = b * c;', 1)
+    assert out == 'a = b * c;'
+    out = reformat.reformat('f(a * b);', 1)
+    assert out == 'f(a * b);'
     out = reformat.reformat('std::cout<<a*b;')
     assert out == 'std::cout << a * b;'
-    out = reformat.reformat('{if (a*b)}')
-    assert out == '{if (a * b)}'
+    out = reformat.reformat('if (a*b)', 1)
+    assert out == 'if (a * b)'
 
 def test_and_operator():
-    out = reformat.reformat('{a = b & c;}')
-    assert out == '{a = b & c; }'
-    out = reformat.reformat('{f(a & b);}')
-    assert out == '{f(a & b); }'
+    out = reformat.reformat('a = b & c;', 1)
+    assert out == 'a = b & c;'
+    out = reformat.reformat('f(a & b);', 1)
+    assert out == 'f(a & b);'
     out = reformat.reformat('std::cout<<a&b;')
     assert out == 'std::cout << a & b;'
-    out = reformat.reformat('{if (a&b)}')
-    assert out == '{if (a & b)}'
+    out = reformat.reformat('if (a&b)', 1)
+    assert out == 'if (a & b)'
 
 def test_pointers():
     out = reformat.reformat('(a*)')
@@ -119,7 +119,7 @@ def test_references():
     assert out == 'A &f(int &c)'
     out = reformat.reformat('int &a = f[b];')
     assert out == 'int &a = f[b];'
-    out = reformat.reformat('f(&a,&b)')
+    out = reformat.reformat('f(&a,&b)', 1)
     assert out == 'f(&a, &b)'
 
 def test_classes():
