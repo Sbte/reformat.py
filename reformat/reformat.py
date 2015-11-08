@@ -52,7 +52,7 @@ class StringReplacer(object):
         self.regex_replace('([\(<]\w+ '+escaped_pointer_type+'[\)>]) \(', '\g<1>(')
 
         # Pointers as function argument etc, like f(a, *b)
-        self.regex_replace('(\W+) '+escaped_pointer_type+'\s*(\w+)', '\g<1> '+pointer_type+'\g<2>')
+        self.regex_replace('(\W+)( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>\g<2>'+pointer_type+'\g<3>')
 
         # Pointers in function definitions and the global scope
         if self.is_global_scope():

@@ -107,6 +107,10 @@ def test_pointers():
     assert out == 'int *a = new int[b];'
     out = reformat.reformat('int *a;')
     assert out == 'int *a;'
+    out = reformat.reformat('f(* a)')
+    assert out == 'f(*a)'
+    out = reformat.reformat('f(* (a) )')
+    assert out == 'f(*(a))'
     out = reformat.reformat('f(*a,*b)')
     assert out == 'f(*a, *b)'
     out = reformat.reformat('A *f(int *a, int *b)')
@@ -121,6 +125,10 @@ def test_references():
     assert out == 'int &a = f[b];'
     out = reformat.reformat('f(&a,&b)', 1)
     assert out == 'f(&a, &b)'
+    out = reformat.reformat('f(& a)', 1)
+    assert out == 'f(&a)'
+    out = reformat.reformat('f(& (a) )', 1)
+    assert out == 'f(&(a))'
 
 def test_classes():
     out = reformat.reformat('class A { int *f(int *a);};')
