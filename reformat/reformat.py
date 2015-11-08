@@ -25,6 +25,10 @@ class StringReplacer(object):
         else:
             self.scope = []
 
+        self.has_newline = False
+        if self.text.endswith('\n'):
+            self.has_newline = True
+
     def replace(self, search, replace):
         if self.type in [self.Normal, self.Index, self.InitializerList]:
             self.text = self.text.replace(search, replace)
@@ -69,7 +73,7 @@ class StringReplacer(object):
     def handle_templates(self):
         '''Handle C++ templates'''
         # Templates and includes should not have spaces
-        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>[ \t]*', '<\g<1>\g<2>> ')
+        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>\s*', '<\g<1>\g<2>> ')
 
         # Template members
         self.replace('> ::', '>::')
@@ -80,11 +84,11 @@ class StringReplacer(object):
     def handle_brackets(self):
         '''Don't allow spaces before and after brackets'''
 
-        self.regex_replace('( ', '(')
-        self.regex_replace(' )', ')')
+        self.regex_replace('\(\s+', '(')
+        self.regex_replace('\s+\)', ')')
 
     def __str__(self):
-        if self.text.endswith('\n'):
+        if self.has_newline:
             return self.text.rstrip() + '\n'
         else:
             return self.text

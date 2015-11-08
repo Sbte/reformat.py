@@ -151,6 +151,8 @@ def test_namespace():
 def test_brackets():
     out = reformat.reformat('( a )')
     assert out == '(a)'
+    out = reformat.reformat('(   a )')
+    assert out == '(a)'
 
 def test_multiline_comments():
     code = '''/*
