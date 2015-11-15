@@ -138,6 +138,14 @@ def test_classes():
     out = reformat.reformat('class A; {f(a*b);}')
     assert out == 'class A; {f(a * b); }'
 
+def test_exponent():
+    out = reformat.reformat('1e-5')
+    assert out == '1e-5'
+    out = reformat.reformat('1.0e-5')
+    assert out == '1.0e-5'
+    out = reformat.reformat('3.5e+5')
+    assert out == '3.5e+5'
+
 def test_namespace():
     code = '''namespace A {
     void f(int *a)

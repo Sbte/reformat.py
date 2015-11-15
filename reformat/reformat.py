@@ -87,6 +87,10 @@ class StringReplacer(object):
         self.regex_replace('\(\s+', '(')
         self.regex_replace('\s+\)', ')')
 
+    def handle_exponent(self):
+        '''Handle exponents like 1.1e-1'''
+        self.regex_replace('(\d*\.\d+|\d+)e ([\+\-]) (\d+)', '\g<1>e\g<2>\g<3>')
+
     def __str__(self):
         if self.has_newline:
             return self.text.rstrip() + '\n'
@@ -305,6 +309,8 @@ def reformat(text_in, base_scope=None):
         for op in ops:
             if op != '-':
                 line_part.replace(op+'-', op+' -')
+
+        line_part.handle_exponent()
 
         line_part.handle_pointers('*')
         line_part.handle_pointers('&')
