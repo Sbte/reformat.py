@@ -264,7 +264,7 @@ def reformat(text_in, base_scope=None):
             continue
 
         # Put spaces around operators
-        ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&']
+        ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|']
         for op in ops:
             line_part.replace(op, ' '+op+' ')
             line_part.replace('  '+op, ' '+op)
@@ -275,8 +275,8 @@ def reformat(text_in, base_scope=None):
             line_part.replace(' '+op+' '+op+' ', op+op)
 
         # Remove spaces between things like // and ==
-        for op2 in ['=', '<', '>', '/']:
-            for op1 in ['=', '+', '-', '*', '/', '<', '>']:
+        for op2 in ['=', '<', '>', '/', '&', '|']:
+            for op1 in ['=', '+', '-', '*', '/', '<', '>', '&', '|']:
                 line_part.replace(op1+' '+op2, op1+op2)
 
         # Remove spaces in indices

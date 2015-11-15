@@ -69,8 +69,6 @@ def test_template_members():
 def test_includes():
     out = reformat.reformat('#include <iostream>')
     assert out == '#include <iostream>'
-
-def test_includes():
     out = reformat.reformat('#include <iostream> \n#include <string>')
     assert out == '#include <iostream>\n#include <string>'
 
@@ -93,6 +91,24 @@ def test_and_operator():
     assert out == 'std::cout << a & b;'
     out = reformat.reformat('if (a&b)', 1)
     assert out == 'if (a & b)'
+    out = reformat.reformat('if (a&&b)', 1)
+    assert out == 'if (a && b)'
+    out = reformat.reformat('if ((a)&&(b))', 1)
+    assert out == 'if ((a) && (b))'
+
+def test_or_operator():
+    out = reformat.reformat('a = b | c;', 1)
+    assert out == 'a = b | c;'
+    out = reformat.reformat('f(a | b);', 1)
+    assert out == 'f(a | b);'
+    out = reformat.reformat('std::cout<<a|b;')
+    assert out == 'std::cout << a | b;'
+    out = reformat.reformat('if (a|b)', 1)
+    assert out == 'if (a | b)'
+    out = reformat.reformat('if (a||b)', 1)
+    assert out == 'if (a || b)'
+    out = reformat.reformat('if ((a)||(b))', 1)
+    assert out == 'if ((a) || (b))'
 
 def test_pointers():
     out = reformat.reformat('(a*)')
