@@ -215,6 +215,12 @@ def reformat(text_in, base_scope=None):
                 line_part = orig_line[pos-1:]
                 break
 
+            if line_part.endswith('#pragma'):
+                line_parts.append(StringReplacer(line_part[:-7], line_type[-1]))
+                line_type.append(StringReplacer.Comment)
+                line_part = orig_line[pos-6:]
+                break
+
             if line_part.endswith('[') and is_normal_line_type(line_type):
                 line_parts.append(StringReplacer(line_part[:-1], line_type[-1]))
                 line_type.append(StringReplacer.Index)

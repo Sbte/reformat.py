@@ -193,6 +193,11 @@ def test_initializer_lists():
     out = reformat.reformat(code)
     assert out == code
 
+def test_pragma():
+    code = '#pragma omp for schedule(static) reduction(+:a)'
+    out = reformat.reformat(code)
+    assert out == code
+
 @pytest.mark.xfail
 def test_pointers_that_are_not_pointers():
     '''This is something that also doesn't work in astyle'''
