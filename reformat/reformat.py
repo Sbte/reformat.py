@@ -305,7 +305,7 @@ def reformat(text_in, base_scope=None):
             line_part.replace(op+' ', op)
 
         # Spaces after keywords
-        for key in ['for', 'if']:
+        for key in ['for', 'if', 'while', 'return']:
             line_part.replace(key+'(', key+' (')
 
         line_part.handle_templates()

@@ -168,6 +168,12 @@ def test_exponent():
     out = reformat.reformat('3.5e+5')
     assert out == '3.5e+5'
 
+def test_return_statement():
+    out = reformat.reformat('return a;')
+    assert out == 'return a;'
+    out = reformat.reformat('return(a);')
+    assert out == 'return (a);'
+
 def test_namespace():
     code = '''namespace A {
     void f(int *a)
