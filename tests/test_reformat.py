@@ -79,6 +79,8 @@ def test_multiplication_operator():
     assert out == 'f(a * b);'
     out = reformat.reformat('std::cout<<a*b;')
     assert out == 'std::cout << a * b;'
+    out = reformat.reformat('std::cout<<*a;')
+    assert out == 'std::cout << *a;'
     out = reformat.reformat('if (a*b)', 1)
     assert out == 'if (a * b)'
 

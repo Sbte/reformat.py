@@ -65,10 +65,10 @@ class StringReplacer(object):
         # lvalue pointers, up to any operator or bracket
         self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
-        # Put back spaces when an operator with more than 1 char was before
-        # the *
-        self.repeated_regex_replace('(>>.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
-        self.repeated_regex_replace('(<<.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
+        # # Put back spaces when an operator with more than 1 char was before
+        # # the *
+        self.repeated_regex_replace('(>>.*\w+.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
+        self.repeated_regex_replace('(<<.*\w+.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
 
     def handle_templates(self):
         '''Handle C++ templates'''
