@@ -112,6 +112,10 @@ def test_or_operator():
     out = reformat.reformat('if ((a)||(b))', 1)
     assert out == 'if ((a) || (b))'
 
+def test_ternary_operator():
+    out = reformat.reformat('a?b:c;')
+    assert out == 'a ? b : c;'
+
 def test_pointers():
     out = reformat.reformat('(a*)')
     assert out == '(a *)'

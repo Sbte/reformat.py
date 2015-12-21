@@ -270,14 +270,14 @@ def reformat(text_in, base_scope=None):
             continue
 
         # Put spaces around operators
-        ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|']
+        ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', ':', '?']
         for op in ops:
             line_part.replace(op, ' '+op+' ')
             line_part.replace('  '+op, ' '+op)
             line_part.replace(op+'  ', op+' ')
 
         # Remove spaces around ++ and --
-        for op in ['-', '+']:
+        for op in ['-', '+', ':']:
             line_part.replace(' '+op+' '+op+' ', op+op)
 
         # Remove spaces between things like // and ==
@@ -333,6 +333,9 @@ def reformat(text_in, base_scope=None):
 
         # Includes should have a space
         line_part.replace('include<', 'include <')
+
+        if line_part.type == StringReplacer.InitializerList:
+            line_part.regex_replace('^ :', ':')
 
         text += str(line_part)
 
