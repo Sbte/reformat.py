@@ -91,6 +91,28 @@ class StringReplacer(object):
         '''Handle exponents like 1.1e-1'''
         self.regex_replace('(\d*\.\d+|\d+)e ([\+\-]) (\d+)', '\g<1>e\g<2>\g<3>')
 
+    def handle_unary(self):
+        '''Handle unary operators like -1'''
+        self.regex_replace('([^\w\]\)\-]) - ', '\g<1> -')
+        self.regex_replace('([^\w\]\)\+]) \+ ', '\g<1> +')
+        self.replace('return - ', 'return -')
+        self.replace('return + ', 'return +')
+
+        # Increment and decrement
+        for op1 in ['+', '-']:
+            for op2 in ['+', '-', '*']:
+                self.replace(op1+op1+' '+op2, op1+op1+' '+op2+ ' ')
+
+    def handle_increment_and_decrement_operator(self):
+        '''Handle ++ and -- operators'''
+        for op in ['+', '-']:
+            escaped_op = re.escape(op)
+            self.replace(' '+op+' '+op+' ', op+op)
+            self.regex_replace('([\+\-\*\/&\|])'+escaped_op+escaped_op,
+                               '\g<1> '+op+op)
+            self.regex_replace(escaped_op+escaped_op+'([\+\-\*\/&\|])',
+                               op+op+' \g<1>')
+
     def __str__(self):
         if self.has_newline:
             return self.text.rstrip() + '\n'
@@ -280,6 +302,8 @@ def reformat(text_in, base_scope=None):
         for op in ['-', '+', ':']:
             line_part.replace(' '+op+' '+op+' ', op+op)
 
+        line_part.handle_increment_and_decrement_operator()
+
         # Remove spaces between things like // and ==
         for op2 in ['=', '<', '>', '/', '&', '|']:
             for op1 in ['=', '+', '-', '*', '/', '<', '>', '&', '|']:
@@ -309,17 +333,12 @@ def reformat(text_in, base_scope=None):
             line_part.replace(key+'(', key+' (')
 
         line_part.handle_templates()
-
-        # -1 should not have spaces
-        line_part.regex_replace('([^\w\]\)]) - ', '\g<1>-')
-        for op in ops:
-            if op != '-':
-                line_part.replace(op+'-', op+' -')
-
         line_part.handle_exponent()
 
         line_part.handle_pointers('*')
         line_part.handle_pointers('&')
+
+        line_part.handle_unary()
 
         # Put spaces after , and ;
         for op in [',', ';']:
