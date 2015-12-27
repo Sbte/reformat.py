@@ -14,7 +14,6 @@ class StringReplacer(object):
     Comment = 2
     MultilineComment = 3
     Index = 4
-    InitializerList = 5
 
     def __init__(self, text, type, scope = None):
         self.text = text
@@ -30,11 +29,11 @@ class StringReplacer(object):
             self.has_newline = True
 
     def replace(self, search, replace):
-        if self.type in [self.Normal, self.Index, self.InitializerList]:
+        if self.type in [self.Normal, self.Index]:
             self.text = self.text.replace(search, replace)
 
     def regex_replace(self, search, replace):
-        if self.type in [self.Normal, self.Index, self.InitializerList]:
+        if self.type in [self.Normal, self.Index]:
             self.text = re.sub(search, replace, self.text)
 
     def repeated_regex_replace(self, search, replace):
@@ -123,7 +122,7 @@ class StringReplacer(object):
         str(self)
 
 def is_normal_line_type(line_type):
-    normal_types = [StringReplacer.Normal, StringReplacer.InitializerList]
+    normal_types = [StringReplacer.Normal]
     if isinstance(line_type, list):
         return line_type[-1] in normal_types
     else:
@@ -140,16 +139,18 @@ def set_scopes(line_parts, base_scope):
             scope = [base_scope]
 
     scope_keyword = ''
+    last_char = ''
     for line_part in line_parts:
         if line_part.type == StringReplacer.Normal:
             new_line_part = ''
             for char in line_part.text:
-                if char == '{':
-                    if scope_keyword == 'initializer list':
-                        # We added a : scope that we need to remove first
-                        scope.pop()
-                        scope_keyword = ''
-
+                if len(scope) > 0  and char == '{' and scope[-1] == 'initializer list':
+                    # We added a : scope that we need to remove first
+                    new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+                    scope.pop()
+                    scope.append(scope_keyword)
+                    scope_keyword = ''
+                elif char == '{':
                     new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
                     scope.append(scope_keyword)
                     scope_keyword = ''
@@ -157,11 +158,32 @@ def set_scopes(line_parts, base_scope):
                 elif char == '}':
                     new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
                     scope.pop()
-                    scope_keyword = ''
+                    if not len(scope):
+                        scope_keyword = ''
+                    else:
+                        scope_keyword = scope[-1]
                     new_line_part = ''
+                elif scope_keyword  == 'initializer list' and char == ';':
+                    # Remove the initializer list scope from all previous scopes
+                    for i in xrange(len(new_line_parts)-1, -1, -1):
+                        part = new_line_parts[i]
+                        if 'initializer list' not in part.scope:
+                            break
+                        while 'initializer list' in part.scope:
+                            part.scope.remove('initializer list')
                 elif scope_keyword and char == ';':
-                    scope_keyword = ''
+                    scope_keyword = '' if not len(scope) else scope[-1]
+                elif char == ':' and scope_keyword != 'initializer list' and last_char == ')':
+                    new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+                    scope_keyword = 'initializer list'
+                    scope.append(scope_keyword)
+                    new_line_part = ''
 
+                # Store the last char to be able to detect initializer lists
+                if not re.match('\s', char):
+                    last_char = char
+
+                # Add the char to the new line part
                 new_line_part += char
 
                 for keyword in ('namespace', 'class', 'struct'):
@@ -169,12 +191,6 @@ def set_scopes(line_parts, base_scope):
                         scope_keyword = keyword
             if new_line_part:
                 new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
-        elif line_part.type == StringReplacer.InitializerList and is_global_scope(scope):
-            scope.append('initializer list')
-            scope_keyword = 'initializer list'
-            new_line_part = ''
-            line_part.scope = list(scope)
-            new_line_parts.append(line_part)
         else:
             line_part.scope = list(scope)
             new_line_parts.append(line_part)
@@ -254,29 +270,6 @@ def reformat(text_in, base_scope=None):
                 line_part = ''
                 continue
 
-            if line_part.endswith('::') and line_type[-1] == StringReplacer.InitializerList:
-                line_part = line_parts.pop()
-                line_part = line_part.text + '::'
-                line_type.pop()
-                continue
-
-            if line_part.endswith(':') and is_normal_line_type(line_type):
-                line_parts.append(StringReplacer(line_part[:-1], line_type[-1]))
-                line_type.append(StringReplacer.InitializerList)
-                line_part = ':'
-                continue
-
-            if line_part.endswith(';') and line_type[-1] == StringReplacer.InitializerList:
-                line_type.pop()
-                line_parts.append(StringReplacer(line_part, line_type[-1]))
-                line_part = ''
-                continue
-
-            if line_part.endswith('{') and line_type[-1] == StringReplacer.InitializerList:
-                line_parts.append(StringReplacer(line_part[:-1], line_type.pop()))
-                line_part = '{'
-                continue
-
         line_parts.append(StringReplacer(line_part, line_type[-1]))
 
     # Check that we popped all other line_types
@@ -286,8 +279,7 @@ def reformat(text_in, base_scope=None):
 
     text = ''
     for line_part in line_parts:
-        if line_part.type not in [StringReplacer.Normal, StringReplacer.Index,
-                                  StringReplacer.InitializerList]:
+        if line_part.type not in [StringReplacer.Normal, StringReplacer.Index]:
             text += str(line_part)
             continue
 
@@ -298,9 +290,8 @@ def reformat(text_in, base_scope=None):
             line_part.replace('  '+op, ' '+op)
             line_part.replace(op+'  ', op+' ')
 
-        # Remove spaces around ++ and --
-        for op in ['-', '+', ':']:
-            line_part.replace(' '+op+' '+op+' ', op+op)
+        # Remove spaces around ::
+        line_part.replace(' : : ', '::')
 
         line_part.handle_increment_and_decrement_operator()
 
@@ -353,10 +344,12 @@ def reformat(text_in, base_scope=None):
         # Includes should have a space
         line_part.replace('include<', 'include <')
 
-        if line_part.type == StringReplacer.InitializerList:
-            line_part.regex_replace('^ :', ':')
-
         text += str(line_part)
+
+    # Remove spaces at the start of the line that were added by us
+    ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', ':', '?']
+    for op in ops:
+        text = re.sub('^ '+re.escape(op), op, text, flags=re.MULTILINE)
 
     return text.rstrip()
 

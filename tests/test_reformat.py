@@ -131,6 +131,12 @@ def test_or_operator():
 def test_ternary_operator():
     out = reformat.reformat('a?b:c;')
     assert out == 'a ? b : c;'
+    out = reformat.reformat('a=1?2:3;')
+    assert out == 'a = 1 ? 2 : 3;'
+    out = reformat.reformat('a=1 ? 2 : 3;')
+    assert out == 'a = 1 ? 2 : 3;'
+    out = reformat.reformat('a ? "a" : "b"')
+    assert out == 'a ? "a" : "b"'
 
 def test_pointers():
     out = reformat.reformat('(a*)')
@@ -205,6 +211,8 @@ def test_brackets():
     assert out == '(a)'
     out = reformat.reformat('(   a )')
     assert out == '(a)'
+    out = reformat.reformat('(   "a" )')
+    assert out == '("a")'
 
 def test_multiline_comments():
     code = '''/*
