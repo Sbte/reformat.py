@@ -15,9 +15,10 @@ class StringReplacer(object):
     MultilineComment = 3
     Index = 4
 
-    def __init__(self, text, type, scope = None):
+    def __init__(self, text, type, first = True, scope = None):
         self.text = text
         self.type = type
+        self.first = first
 
         if scope:
             self.scope = list(scope)
@@ -58,11 +59,12 @@ class StringReplacer(object):
         self.regex_replace('([^\w\)]+)( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>\g<2>'+pointer_type+'\g<3>')
 
         # Pointers in function definitions and the global scope
-        if self.is_global_scope():
+        if self.is_global_scope() and self.first:
             self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
-        self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
+        if self.first:
+            self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # # Put back spaces when an operator with more than 1 char was before
         # # the *
@@ -146,17 +148,20 @@ def set_scopes(line_parts, base_scope):
             for char in line_part.text:
                 if len(scope) > 0  and char == '{' and scope[-1] == 'initializer list':
                     # We added a : scope that we need to remove first
-                    new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+                    new_line_parts.append(StringReplacer(
+                        new_line_part,StringReplacer.Normal, line_part.first, scope))
                     scope.pop()
                     scope.append(scope_keyword)
                     scope_keyword = ''
                 elif char == '{':
-                    new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+                    new_line_parts.append(StringReplacer(
+                        new_line_part, StringReplacer.Normal, line_part.first, scope))
                     scope.append(scope_keyword)
                     scope_keyword = ''
                     new_line_part = ''
                 elif char == '}':
-                    new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+                    new_line_parts.append(StringReplacer(
+                        new_line_part, StringReplacer.Normal, line_part.first, scope))
                     scope.pop()
                     if not len(scope):
                         scope_keyword = ''
@@ -174,7 +179,8 @@ def set_scopes(line_parts, base_scope):
                 elif scope_keyword and char == ';':
                     scope_keyword = '' if not len(scope) else scope[-1]
                 elif char == ':' and scope_keyword != 'initializer list' and last_char == ')':
-                    new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+                    new_line_parts.append(StringReplacer(
+                        new_line_part, StringReplacer.Normal, line_part.first, scope))
                     scope_keyword = 'initializer list'
                     scope.append(scope_keyword)
                     new_line_part = ''
@@ -190,7 +196,8 @@ def set_scopes(line_parts, base_scope):
                     if re.match('^\W*'+keyword+'\W$', new_line_part):
                         scope_keyword = keyword
             if new_line_part:
-                new_line_parts.append(StringReplacer(new_line_part, StringReplacer.Normal, scope))
+                new_line_parts.append(StringReplacer(
+                    new_line_part, StringReplacer.Normal, line_part.first, scope))
         else:
             line_part.scope = list(scope)
             new_line_parts.append(line_part)
@@ -221,56 +228,72 @@ def reformat(text_in, base_scope=None):
         if line_type[-1] == StringReplacer.Comment:
             line_type.pop()
 
+        first = True
         for pos, char in enumerate(orig_line):
             line_part += char
 
             if line_type[-1] == StringReplacer.MultilineComment:
                 if line_part.endswith('*/'):
-                    line_parts.append(StringReplacer(line_part, line_type.pop()))
+                    line_parts.append(StringReplacer(
+                        line_part, line_type.pop(), first))
+                    first = False
                     line_part = ''
                     continue
                 else:
                     continue
 
             if line_part.endswith('/*'):
-                line_parts.append(StringReplacer(line_part[:-2], line_type[-1]))
+                line_parts.append(StringReplacer(
+                    line_part[:-2], line_type[-1], first))
                 line_type.append(StringReplacer.MultilineComment)
+                first = False
                 line_part = '/*'
                 continue
 
             if char == '"':
                 if line_type[-1] == StringReplacer.String:
-                    line_parts.append(StringReplacer(line_part, line_type.pop()))
+                    line_parts.append(StringReplacer(
+                        line_part, line_type.pop(), first))
                 else:
-                    line_parts.append(StringReplacer(line_part, line_type[-1]))
+                    line_parts.append(StringReplacer(
+                        line_part, line_type[-1], first))
                     line_type.append(StringReplacer.String)
+                first = False
                 line_part = ''
                 continue
 
             if line_part.endswith('//'):
-                line_parts.append(StringReplacer(line_part[:-2], line_type[-1]))
+                line_parts.append(StringReplacer(
+                    line_part[:-2], line_type[-1], first))
                 line_type.append(StringReplacer.Comment)
+                first = False
                 line_part = orig_line[pos-1:]
                 break
 
             if line_part.endswith('#pragma'):
-                line_parts.append(StringReplacer(line_part[:-7], line_type[-1]))
+                line_parts.append(StringReplacer(
+                    line_part[:-7], line_type[-1], first))
                 line_type.append(StringReplacer.Comment)
+                first = False
                 line_part = orig_line[pos-6:]
                 break
 
             if line_part.endswith('[') and is_normal_line_type(line_type):
-                line_parts.append(StringReplacer(line_part[:-1], line_type[-1]))
+                line_parts.append(StringReplacer(
+                    line_part[:-1], line_type[-1], first))
                 line_type.append(StringReplacer.Index)
+                first = False
                 line_part = '['
                 continue
 
             if line_part.endswith(']') and line_type[-1] == StringReplacer.Index:
-                line_parts.append(StringReplacer(line_part, line_type.pop()))
+                line_parts.append(StringReplacer(
+                    line_part, line_type.pop(), first))
+                first = False
                 line_part = ''
                 continue
 
-        line_parts.append(StringReplacer(line_part, line_type[-1]))
+        line_parts.append(StringReplacer(line_part, line_type[-1], first))
 
     # Check that we popped all other line_types
     # assert line_type == [StringReplacer.Normal]
