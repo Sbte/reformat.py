@@ -99,6 +99,8 @@ def test_multiplication_operator():
     assert out == 'std::cout << *a;'
     out = reformat.reformat('if (a*b)', 1)
     assert out == 'if (a * b)'
+    out = reformat.reformat('f((a*b)*c)', 1)
+    assert out == 'f((a * b) * c)'
 
 def test_and_operator():
     out = reformat.reformat('a = b & c;', 1)
