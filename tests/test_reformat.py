@@ -209,12 +209,16 @@ def test_return_statement():
 
 def test_namespace():
     code = '''namespace A {
-    void f(int *a)
-    {
-        g(a * b);
-    }
+
+void f(int *a)
+{
+    g(a * b);
+}
+
 }'''
     out = reformat.reformat(code)
+    assert out == code
+    out = reformat.reformat(code, set_indent=True)
     assert out == code
 
 def test_brackets():

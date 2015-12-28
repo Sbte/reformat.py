@@ -2,11 +2,15 @@ import sys
 import os
 import re
 
-def is_global_scope(scope):
+def num_scopes(scope):
+    scopes = 0
     for s in scope:
         if s not in ('namespace', 'struct', 'class'):
-            return False
-    return True
+            scopes += 1
+    return scopes
+
+def is_global_scope(scope):
+    return not num_scopes(scope)
 
 class StringReplacer(object):
     Normal = 0
@@ -18,7 +22,8 @@ class StringReplacer(object):
     def __init__(self, text, type, first = True, scope = None):
         self.text = text
         self.type = type
-        self.first = first
+        self.start_of_line = first
+        self.start_of_statement = first
 
         if scope:
             self.scope = list(scope)
@@ -59,11 +64,11 @@ class StringReplacer(object):
         self.regex_replace('([^\w\)]+)( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>\g<2>'+pointer_type+'\g<3>')
 
         # Pointers in function definitions and the global scope
-        if self.is_global_scope() and self.first:
+        if self.is_global_scope() and self.start_of_statement:
             self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
-        if self.first:
+        if self.start_of_statement:
             self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # # Put back spaces when an operator with more than 1 char was before
@@ -118,6 +123,15 @@ class StringReplacer(object):
             self.regex_replace(escaped_op+escaped_op+'([\+\-\*\/&\|])',
                                op+op+' \g<1>')
 
+    def set_indenting(self):
+        '''Set the indenting of the line part based on the scope'''
+        if not self.start_of_line:
+            return
+
+        text = self.text.lstrip()
+        text = "    " * num_scopes(self.scope) + text
+        self.text = text
+
     def __str__(self):
         if self.has_newline:
             return self.text.rstrip() + '\n'
@@ -134,90 +148,112 @@ def is_normal_line_type(line_type):
     else:
         return line_type in normal_types
 
-def set_scopes(line_parts, base_scope):
-    new_line_parts = []
+class ScopeSetter(object):
+    def __init__(self, line_parts, base_scope=None):
+        self.line_parts = line_parts
+        self.new_line_parts = []
 
-    scope = []
-    if base_scope:
-        if isinstance(base_scope, list):
-            scope = base_scope
-        else:
-            scope = [base_scope]
+        self.scope = []
+        self.base_scope = base_scope
+        if base_scope:
+            if isinstance(base_scope, list):
+                self.scope = base_scope
+            else:
+                self.scope = [base_scope]
 
-    scope_keyword = ''
-    last_char = ''
-    for line_part in line_parts:
-        if line_part.type == StringReplacer.Normal:
-            new_line_part = ''
-            for char in line_part.text:
-                if len(scope) > 0  and char == '{' and scope[-1] == 'initializer list':
-                    # We added a : scope that we need to remove first
-                    new_line_parts.append(StringReplacer(
-                        new_line_part,StringReplacer.Normal, line_part.first, scope))
-                    scope.pop()
-                    scope.append(scope_keyword)
-                    scope_keyword = ''
-                elif char == '{':
-                    new_line_parts.append(StringReplacer(
-                        new_line_part, StringReplacer.Normal, line_part.first, scope))
-                    scope.append(scope_keyword)
-                    scope_keyword = ''
-                    new_line_part = ''
-                elif char == '}':
-                    new_line_parts.append(StringReplacer(
-                        new_line_part, StringReplacer.Normal, line_part.first, scope))
-                    scope.pop()
-                    if not len(scope):
-                        scope_keyword = ''
+        self.scope_keyword = ''
+        self.last_char = ''
+
+        self.start_of_statement = True
+        self.start_of_line = True
+
+    def add_line_part(self):
+        '''Add a new line part to the new_line_parts list'''
+        if self.new_line_part == '':
+            return
+
+        self.new_line_parts.append(StringReplacer(
+            self.new_line_part, StringReplacer.Normal, self.start_of_line, self.scope))
+        self.new_line_parts[-1].start_of_statement = self.start_of_statement
+        self.new_line_part = ''
+
+        self.start_of_statement = True
+        self.start_of_line = False
+
+    def parse(self):
+        '''Parse the line_parts list that was set in the constructor'''
+        for line_part in self.line_parts:
+            self.start_of_statement = line_part.start_of_line
+            self.start_of_line = line_part.start_of_line
+            if line_part.type == StringReplacer.Normal:
+                self.new_line_part = ''
+                for char in line_part.text:
+                    if len(self.scope) > 0  and char == '{' and \
+                       self.scope[-1] == 'initializer list':
+                        # We added a : scope that we need to remove
+                        self.new_line_part += char
+                        self.add_line_part()
+                        self.scope.pop()
+                        self.scope.append(self.scope_keyword)
+                        self.scope_keyword = ''
+                    elif char == '{':
+                        self.new_line_part += char
+                        self.add_line_part()
+                        self.scope.append(self.scope_keyword)
+                        self.scope_keyword = ''
+                    elif char == '}':
+                        self.add_line_part()
+                        self.scope.pop()
+                        if not len(self.scope):
+                            self.scope_keyword = ''
+                        else:
+                            self.scope_keyword = self.scope[-1]
+                        self.new_line_part += char
+                    elif self.scope_keyword  == 'initializer list' and char == ';':
+                        # Remove the initializer list scope from all previous scopes
+                        for i in xrange(len(self.new_line_parts)-1, -1, -1):
+                            part = self.new_line_parts[i]
+                            if 'initializer list' not in part.scope:
+                                break
+                            while 'initializer list' in part.scope:
+                                self.part.scope.remove('initializer list')
+                        self.new_line_part += char
+                    elif self.scope_keyword and char == ';':
+                        self.scope_keyword = '' if not len(self.scope) else self.scope[-1]
+                        self.new_line_part += char
+                    elif char == ':' and self.scope_keyword != 'initializer list' and self.last_char == ')':
+                        self.new_line_part += char
+                        self.add_line_part()
+                        self.scope_keyword = 'initializer list'
+                        self.scope.append(self.scope_keyword)
                     else:
-                        scope_keyword = scope[-1]
-                    new_line_part = ''
-                elif scope_keyword  == 'initializer list' and char == ';':
-                    # Remove the initializer list scope from all previous scopes
-                    for i in xrange(len(new_line_parts)-1, -1, -1):
-                        part = new_line_parts[i]
-                        if 'initializer list' not in part.scope:
-                            break
-                        while 'initializer list' in part.scope:
-                            part.scope.remove('initializer list')
-                elif scope_keyword and char == ';':
-                    scope_keyword = '' if not len(scope) else scope[-1]
-                elif char == ':' and scope_keyword != 'initializer list' and last_char == ')':
-                    new_line_parts.append(StringReplacer(
-                        new_line_part, StringReplacer.Normal, line_part.first, scope))
-                    scope_keyword = 'initializer list'
-                    scope.append(scope_keyword)
-                    new_line_part = ''
+                        self.new_line_part += char
 
-                # Store the last char to be able to detect initializer lists
-                if not re.match('\s', char):
-                    last_char = char
+                    # Store the last char to be able to detect initializer lists
+                    if not re.match('\s', char):
+                        self.last_char = char
 
-                # Add the char to the new line part
-                new_line_part += char
+                    for keyword in ('namespace', 'class', 'struct'):
+                        if re.match('^\W*'+keyword+'\W$', self.new_line_part):
+                            self.scope_keyword = keyword
+                if self.new_line_part:
+                    self.add_line_part()
+            else:
+                line_part.scope = list(self.scope)
+                self.new_line_parts.append(line_part)
 
-                for keyword in ('namespace', 'class', 'struct'):
-                    if re.match('^\W*'+keyword+'\W$', new_line_part):
-                        scope_keyword = keyword
-            if new_line_part:
-                new_line_parts.append(StringReplacer(
-                    new_line_part, StringReplacer.Normal, line_part.first, scope))
+        # All scopes should be closed at the end of the file
+        if self.base_scope:
+            if isinstance(self.base_scope, list):
+                assert self.scope == self.base_scope
+            else:
+                assert self.scope == [self.base_scope]
         else:
-            line_part.scope = list(scope)
-            new_line_parts.append(line_part)
+            assert self.scope == []
 
-    # All scopes should be closed at the end of the file
-    if base_scope:
-        if isinstance(base_scope, list):
-            assert scope == base_scope
-        else:
-            assert scope == [base_scope]
-    else:
-        assert scope == []
+        return self.new_line_parts
 
-    return new_line_parts
-
-def reformat(text_in, base_scope=None):
+def reformat(text_in, base_scope=None, set_indent=False):
     if isinstance(text_in, basestring):
         lines = text_in.splitlines(True)
     else:
@@ -302,7 +338,8 @@ def reformat(text_in, base_scope=None):
     # Check that we popped all other line_types
     # assert line_type == [StringReplacer.Normal]
 
-    line_parts = set_scopes(line_parts, base_scope)
+    set_scopes = ScopeSetter(line_parts, base_scope)
+    line_parts = set_scopes.parse()
 
     text = ''
     for line_part in line_parts:
@@ -373,6 +410,9 @@ def reformat(text_in, base_scope=None):
         # Includes should have a space
         line_part.replace('include<', 'include <')
 
+        if set_indent:
+            line_part.set_indenting()
+
         text += str(line_part)
 
     # Remove spaces at the start of the line that were added by us
@@ -400,7 +440,7 @@ def main():
         f.write(''.join(lines))
         f.close()
 
-    text = reformat(lines)
+    text = reformat(lines, set_indent=True)
 
     f = open(fname, 'w')
     f.write(text)
