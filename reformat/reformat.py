@@ -88,6 +88,10 @@ class StringReplacer(object):
         self.regex_replace('\(\s+', '(')
         self.regex_replace('\s+\)', ')')
 
+    def handle_eol_colon(self):
+        '''Handle exponents like 1.1e-1'''
+        self.regex_replace('\s:\s+$', ':')
+
     def handle_exponent(self):
         '''Handle exponents like 1.1e-1'''
         self.regex_replace('(\d*\.\d+|\d+)e ([\+\-]) (\d+)', '\g<1>e\g<2>\g<3>')
@@ -315,6 +319,8 @@ def reformat(text_in, base_scope=None):
 
         # Remove spaces around ::
         line_part.replace(' : : ', '::')
+
+        line_part.handle_eol_colon()
 
         line_part.handle_increment_and_decrement_operator()
 

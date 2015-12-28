@@ -185,6 +185,13 @@ def test_classes():
     assert out == 'class A; void f(a *b);'
     out = reformat.reformat('class A; {f(a*b);}')
     assert out == 'class A; {f(a * b); }'
+    code = '''class A
+{
+public:
+    A();
+}'''
+    out = reformat.reformat(code)
+    assert out == code
 
 def test_exponent():
     out = reformat.reformat('1e-5')
