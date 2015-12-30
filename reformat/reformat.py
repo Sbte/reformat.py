@@ -5,7 +5,7 @@ import re
 def num_scopes(scope):
     scopes = 0
     for s in scope:
-        if s not in ('namespace', 'struct', 'class'):
+        if s not in ('namespace', 'struct', 'class', '('):
             scopes += 1
     return scopes
 
@@ -29,10 +29,6 @@ class StringReplacer(object):
             self.scope = list(scope)
         else:
             self.scope = []
-
-        self.has_newline = False
-        if self.text.endswith('\n'):
-            self.has_newline = True
 
     def replace(self, search, replace):
         if self.type in [self.Normal, self.Index]:
@@ -62,24 +58,26 @@ class StringReplacer(object):
 
         # Pointers as function argument etc, like f(a, *b)
         self.regex_replace('([^\w\)]+)( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>\g<2>'+pointer_type+'\g<3>')
+        if self.start_of_statement:
+            self.regex_replace('^( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>'+pointer_type+'\g<2>')
 
         # Pointers in function definitions and the global scope
         if self.is_global_scope() and self.start_of_statement:
             self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
-        if self.start_of_statement:
+        if self.start_of_statement and not '(' in self.scope:
             self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
-        # # Put back spaces when an operator with more than 1 char was before
-        # # the *
+        # Put back spaces when an operator with more than 1 char was before
+        # the *
         self.repeated_regex_replace('(>>.*\w+.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
         self.repeated_regex_replace('(<<.*\w+.*) '+escaped_pointer_type+'([^ ])', '\g<1> '+pointer_type+' \g<2>')
 
     def handle_templates(self):
         '''Handle C++ templates'''
         # Templates and includes should not have spaces
-        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>\s*', '<\g<1>\g<2>> ')
+        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>[^\S\n]*', '<\g<1>\g<2>> ')
 
         # Template members
         self.replace('> ::', '>::')
@@ -90,12 +88,12 @@ class StringReplacer(object):
     def handle_brackets(self):
         '''Don't allow spaces before and after brackets'''
 
-        self.regex_replace('\(\s+', '(')
+        self.regex_replace('\([^\S\n]+', '(')
         self.regex_replace('\s+\)', ')')
 
     def handle_eol_colon(self):
-        '''Handle exponents like 1.1e-1'''
-        self.regex_replace('\s:\s+$', ':')
+        '''Handle colons at the end of the line like in public:'''
+        self.regex_replace('\s:[^\S\n]+$', ':')
 
     def handle_exponent(self):
         '''Handle exponents like 1.1e-1'''
@@ -103,8 +101,13 @@ class StringReplacer(object):
 
     def handle_unary(self):
         '''Handle unary operators like -1'''
-        self.regex_replace('([^\w\]\)\-]) - ', '\g<1> -')
+        self.regex_replace('([^\w\]\)\-]) \- ', '\g<1> -')
         self.regex_replace('([^\w\]\)\+]) \+ ', '\g<1> +')
+
+        if self.start_of_statement:
+            self.regex_replace('^\s*\- ', '-')
+            self.regex_replace('^\s*\+ ', '+')
+
         self.replace('return - ', 'return -')
         self.replace('return + ', 'return +')
 
@@ -128,15 +131,17 @@ class StringReplacer(object):
         if not self.start_of_line:
             return
 
+        # Handle empty lines
+        if self.text.endswith('\n') and self.text.lstrip() == '':
+            self.text = '\n'
+            return
+
         text = self.text.lstrip()
         text = "    " * num_scopes(self.scope) + text
         self.text = text
 
     def __str__(self):
-        if self.has_newline:
-            return self.text.rstrip() + '\n'
-        else:
-            return self.text
+        return self.text
 
     def __repr__(self):
         str(self)
@@ -182,8 +187,10 @@ class ScopeSetter(object):
 
     def parse(self):
         '''Parse the line_parts list that was set in the constructor'''
+        brackets = {'{': '}', '(': ')'}
+
+        self.start_of_statement = True
         for line_part in self.line_parts:
-            self.start_of_statement = line_part.start_of_line
             self.start_of_line = line_part.start_of_line
             if line_part.type == StringReplacer.Normal:
                 self.new_line_part = ''
@@ -194,38 +201,46 @@ class ScopeSetter(object):
                         self.new_line_part += char
                         self.add_line_part()
                         self.scope.pop()
-                        self.scope.append(self.scope_keyword)
+                        self.scope.append(char)
                         self.scope_keyword = ''
-                    elif char == '{':
+                    elif char in brackets.iterkeys():
                         self.new_line_part += char
                         self.add_line_part()
-                        self.scope.append(self.scope_keyword)
+                        self.scope.append(self.scope_keyword or char)
                         self.scope_keyword = ''
                     elif char == '}':
                         self.add_line_part()
                         self.scope.pop()
-                        if not len(self.scope):
-                            self.scope_keyword = ''
-                        else:
-                            self.scope_keyword = self.scope[-1]
+                        self.scope_keyword = ''
                         self.new_line_part += char
-                    elif self.scope_keyword  == 'initializer list' and char == ';':
+                    elif char == ')':
+                        self.new_line_part += char
+                        self.add_line_part()
+                        self.scope.pop()
+                        self.scope_keyword = ''
+                        self.start_of_statement = False
+                    elif len(self.scope) > 0 and self.scope[-1]  == 'initializer list' and char == ';':
                         # Remove the initializer list scope from all previous scopes
                         for i in xrange(len(self.new_line_parts)-1, -1, -1):
                             part = self.new_line_parts[i]
                             if 'initializer list' not in part.scope:
                                 break
                             while 'initializer list' in part.scope:
-                                self.part.scope.remove('initializer list')
+                                part.scope.remove('initializer list')
                         self.new_line_part += char
+                        self.add_line_part()
                     elif self.scope_keyword and char == ';':
                         self.scope_keyword = '' if not len(self.scope) else self.scope[-1]
                         self.new_line_part += char
-                    elif char == ':' and self.scope_keyword != 'initializer list' and self.last_char == ')':
+                        self.add_line_part()
+                    elif char == ':' and self.last_char == ')':
                         self.new_line_part += char
                         self.add_line_part()
-                        self.scope_keyword = 'initializer list'
-                        self.scope.append(self.scope_keyword)
+                        self.start_of_statement = False
+                        self.scope.append('initializer list')
+                    elif char == ';':
+                        self.new_line_part += char
+                        self.add_line_part()
                     else:
                         self.new_line_part += char
 
@@ -241,6 +256,10 @@ class ScopeSetter(object):
             else:
                 line_part.scope = list(self.scope)
                 self.new_line_parts.append(line_part)
+                if line_part.type == StringReplacer.Comment:
+                    self.start_of_statement = True
+                else:
+                    self.start_of_statement = False
 
         # All scopes should be closed at the end of the file
         if self.base_scope:
@@ -410,17 +429,24 @@ def reformat(text_in, base_scope=None, set_indent=False):
         # Includes should have a space
         line_part.replace('include<', 'include <')
 
+        if line_part.start_of_statement and not line_part.start_of_line:
+            line_part.regex_replace('^[^\S\n]+', '')
+
         if set_indent:
             line_part.set_indenting()
 
         text += str(line_part)
+
+    # Remove spaces at the end of the lines
+    print text
+    text = re.sub('[^\S\n]+$', '', text, flags=re.MULTILINE)
 
     # Remove spaces at the start of the line that were added by us
     ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', ':', '?']
     for op in ops:
         text = re.sub('^ '+re.escape(op), op, text, flags=re.MULTILINE)
 
-    return text.rstrip()
+    return text
 
 def main():
     if len(sys.argv) < 2:
