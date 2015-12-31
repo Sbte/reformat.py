@@ -164,6 +164,12 @@ def test_pointers():
     out = reformat.reformat('A *f(int *a, int *b)')
     assert out == 'A *f(int *a, int *b)'
 
+def test_pointer_dereference():
+    out = reformat.reformat('a->get();')
+    assert out == 'a->get();'
+    out = reformat.reformat('(*a)->get();')
+    assert out == '(*a)->get();'
+
 def test_references():
     out = reformat.reformat('void f(int &c)')
     assert out == 'void f(int &c)'
@@ -177,6 +183,8 @@ def test_references():
     assert out == 'f(&a)'
     out = reformat.reformat('f(& (a) )', 1)
     assert out == 'f(&(a))'
+    out = reformat.reformat('A &f(int &a, int &b)')
+    assert out == 'A &f(int &a, int &b)'
 
 def test_classes():
     out = reformat.reformat('class A { int *f(int *a);};')
@@ -192,6 +200,16 @@ public:
 }'''
     out = reformat.reformat(code)
     assert out == code
+    code = '''namespace N {
+class A
+{
+public:
+    A f(int const &a, int const &b);
+};
+
+}'''
+    out = reformat.reformat(code)
+    assert out == code
 
 def test_exponent():
     out = reformat.reformat('1e-5')
@@ -200,6 +218,18 @@ def test_exponent():
     assert out == '1.0e-5'
     out = reformat.reformat('3.5e+5')
     assert out == '3.5e+5'
+
+def test_if_statement():
+    out = reformat.reformat('if (a != b) c;')
+    assert out == 'if (a != b) c;'
+
+def test_for_statement():
+    out = reformat.reformat('for(int i=0;i<c;++i) a;')
+    assert out == 'for (int i = 0; i < c; ++i) a;'
+    out = reformat.reformat('for(int i=0;i<c;++i)')
+    assert out == 'for (int i = 0; i < c; ++i)'
+    out = reformat.reformat('for ( int i = 0 ; i < c ; ++i ) ')
+    assert out == 'for (int i = 0; i < c; ++i)'
 
 def test_return_statement():
     out = reformat.reformat('return a;')

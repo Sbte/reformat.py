@@ -24,11 +24,14 @@ class StringReplacer(object):
         self.type = type
         self.start_of_line = first
         self.start_of_statement = first
+        self.after_bracket = False
 
         if scope:
             self.scope = list(scope)
         else:
             self.scope = []
+
+        self.keywords = ['for', 'if', 'while', 'return']
 
     def replace(self, search, replace):
         if self.type in [self.Normal, self.Index]:
@@ -66,7 +69,8 @@ class StringReplacer(object):
             self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
-        if self.start_of_statement and not '(' in self.scope:
+        if self.start_of_statement and not '(' in self.scope and \
+           (len(self.scope) and not self.scope[-1] in self.keywords):
             self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # Put back spaces when an operator with more than 1 char was before
@@ -87,6 +91,10 @@ class StringReplacer(object):
 
     def handle_brackets(self):
         '''Don't allow spaces before and after brackets'''
+
+        # Handle spaces after a bracket
+        if self.after_bracket:
+            self.regex_replace('^[^\S\n]*([^\(])', ' \g<1>')
 
         self.regex_replace('\([^\S\n]+', '(')
         self.regex_replace('\s+\)', ')')
@@ -125,6 +133,27 @@ class StringReplacer(object):
                                '\g<1> '+op+op)
             self.regex_replace(escaped_op+escaped_op+'([\+\-\*\/&\|])',
                                op+op+' \g<1>')
+
+    def handle_keywords(self):
+        '''Spaces after keywords'''
+        for key in self.keywords:
+            self.replace(key+'(', key+' (')
+
+    def handle_punctuation(self):
+        '''Handle punctuation like . , ;'''
+        # Put spaces after , and ;
+        for op in [',', ';']:
+            self.regex_replace(re.escape(op)+'[^\S\n]*', op+' ')
+
+        # Remove spaces before , ; .
+        for op in [',', ';', '.']:
+            self.regex_replace('\s+'+re.escape(op), op)
+
+        # Remove spaces after .
+        for op in ['.']:
+            self.regex_replace(re.escape(op)+'[^\S\n]+', op)
+
+        print self.scope
 
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
@@ -171,6 +200,7 @@ class ScopeSetter(object):
 
         self.start_of_statement = True
         self.start_of_line = True
+        self.after_bracket = False
 
     def add_line_part(self):
         '''Add a new line part to the new_line_parts list'''
@@ -180,10 +210,12 @@ class ScopeSetter(object):
         self.new_line_parts.append(StringReplacer(
             self.new_line_part, StringReplacer.Normal, self.start_of_line, self.scope))
         self.new_line_parts[-1].start_of_statement = self.start_of_statement
+        self.new_line_parts[-1].after_bracket = self.after_bracket
         self.new_line_part = ''
 
         self.start_of_statement = True
         self.start_of_line = False
+        self.after_bracket = False
 
     def parse(self):
         '''Parse the line_parts list that was set in the constructor'''
@@ -216,9 +248,13 @@ class ScopeSetter(object):
                     elif char == ')':
                         self.new_line_part += char
                         self.add_line_part()
+                        if self.scope[-1] in line_part.keywords:
+                            self.start_of_statement = True
+                        else:
+                            self.start_of_statement = False
+                        self.after_bracket = True
                         self.scope.pop()
                         self.scope_keyword = ''
-                        self.start_of_statement = False
                     elif len(self.scope) > 0 and self.scope[-1]  == 'initializer list' and char == ';':
                         # Remove the initializer list scope from all previous scopes
                         for i in xrange(len(self.new_line_parts)-1, -1, -1):
@@ -230,7 +266,7 @@ class ScopeSetter(object):
                         self.new_line_part += char
                         self.add_line_part()
                     elif self.scope_keyword and char == ';':
-                        self.scope_keyword = '' if not len(self.scope) else self.scope[-1]
+                        self.scope_keyword = ''
                         self.new_line_part += char
                         self.add_line_part()
                     elif char == ':' and self.last_char == ')':
@@ -250,6 +286,11 @@ class ScopeSetter(object):
 
                     for keyword in ('namespace', 'class', 'struct'):
                         if re.match('^\W*'+keyword+'\W$', self.new_line_part):
+                            self.scope_keyword = keyword
+
+                    for keyword in line_part.keywords:
+                        if re.match('\W+'+keyword+'\W$', self.new_line_part) or \
+                           re.match('^'+keyword+'\W$', self.new_line_part):
                             self.scope_keyword = keyword
                 if self.new_line_part:
                     self.add_line_part()
@@ -396,17 +437,12 @@ def reformat(text_in, base_scope=None, set_indent=False):
         line_part.replace('!=  ', '!= ')
         line_part.replace('  !=', ' !=')
 
-        # Pointer dereference
-        line_part.replace(' - >  ', '->')
-
         # Remove spaces around operators
         for op in ['->']:
             line_part.replace(' '+op, op)
             line_part.replace(op+' ', op)
 
-        # Spaces after keywords
-        for key in ['for', 'if', 'while', 'return']:
-            line_part.replace(key+'(', key+' (')
+        line_part.handle_keywords()
 
         line_part.handle_templates()
         line_part.handle_exponent()
@@ -416,21 +452,20 @@ def reformat(text_in, base_scope=None, set_indent=False):
 
         line_part.handle_unary()
 
-        # Put spaces after , and ;
-        for op in [',', ';']:
-            line_part.replace(op, op+' ')
-            line_part.replace(op+'  ', op+' ')
-
         # Comments at the start of a line_part should stay there
         line_part.regex_replace('^ //', '//')
 
+        if line_part.start_of_statement and not line_part.start_of_line:
+            line_part.regex_replace('^[^\S\n]+', '')
+
         line_part.handle_brackets()
+        line_part.handle_punctuation()
+
+        # Pointer dereference ->
+        line_part.regex_replace('\s*\-\s*>[^\S\n]*', '->')
 
         # Includes should have a space
         line_part.replace('include<', 'include <')
-
-        if line_part.start_of_statement and not line_part.start_of_line:
-            line_part.regex_replace('^[^\S\n]+', '')
 
         if set_indent:
             line_part.set_indenting()
@@ -438,7 +473,6 @@ def reformat(text_in, base_scope=None, set_indent=False):
         text += str(line_part)
 
     # Remove spaces at the end of the lines
-    print text
     text = re.sub('[^\S\n]+$', '', text, flags=re.MULTILINE)
 
     # Remove spaces at the start of the line that were added by us
