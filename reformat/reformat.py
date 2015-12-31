@@ -33,6 +33,10 @@ class StringReplacer(object):
 
         self.keywords = ['for', 'if', 'while', 'return']
 
+        self.indentation = ''
+        if self.start_of_line:
+            self.indentation = re.match('^\s*', self.text).group(0)
+
     def replace(self, search, replace):
         if self.type in [self.Normal, self.Index]:
             self.text = self.text.replace(search, replace)
@@ -153,8 +157,6 @@ class StringReplacer(object):
         for op in ['.']:
             self.regex_replace(re.escape(op)+'[^\S\n]+', op)
 
-        print self.scope
-
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
         if not self.start_of_line:
@@ -165,12 +167,14 @@ class StringReplacer(object):
             self.text = '\n'
             return
 
-        text = self.text.lstrip()
-        text = "    " * num_scopes(self.scope) + text
-        self.text = text
+        self.text = self.text.lstrip()
+        self.indentation = "    " * num_scopes(self.scope)
 
     def __str__(self):
-        return self.text
+        if self.start_of_line:
+            return self.indentation + self.text.lstrip()
+        else:
+            return self.text
 
     def __repr__(self):
         str(self)
