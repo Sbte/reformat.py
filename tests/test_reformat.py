@@ -219,6 +219,8 @@ public:
 };'''
     out = reformat.reformat(code)
     assert out == code
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
 
 def test_inheritance():
     code = '''class A : public B,

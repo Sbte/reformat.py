@@ -176,7 +176,12 @@ class StringReplacer(object):
             return
 
         self.text = self.text.lstrip()
-        self.indentation = "    " * num_scopes(self.scope)
+        scopes = num_scopes(self.scope)
+        # Class definitions (public is not indented,
+        # but function definitions are)
+        scopes += ('class' in self.scope or 'struct' in self.scope) and \
+                  not self.text.rstrip().endswith(':')
+        self.indentation = "    " * scopes
 
     def __str__(self):
         if self.start_of_line:
