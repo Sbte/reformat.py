@@ -16,6 +16,8 @@ def test_unary_plus_operator():
 def test_minus_operator():
     out = reformat.reformat('a-b')
     assert out == 'a - b'
+    out = reformat.reformat('a-     b')
+    assert out == 'a - b'
 
 def test_unary_minus_operator():
     out = reformat.reformat('(-a-b)')
@@ -208,6 +210,23 @@ public:
 };
 
 }'''
+    out = reformat.reformat(code)
+    assert out == code
+    code = '''class A
+{
+public:
+    A f(int const &a, int const &b);
+};'''
+    out = reformat.reformat(code)
+    assert out == code
+
+def test_inheritance():
+    code = '''class A : public B,
+    public C
+{
+public:
+    A f(int const &a, int const &b);
+};'''
     out = reformat.reformat(code)
     assert out == code
 

@@ -45,6 +45,13 @@ class StringReplacer(object):
         if self.type in [self.Normal, self.Index]:
             self.text = re.sub(search, replace, self.text)
 
+    def repeated_replace(self, search, replace):
+        text = self.text
+        self.replace(search, replace)
+        while text != self.text:
+            text = self.text
+            self.replace(search, replace)
+
     def repeated_regex_replace(self, search, replace):
         text = self.text
         self.regex_replace(search, replace)
@@ -103,9 +110,10 @@ class StringReplacer(object):
         self.regex_replace('\([^\S\n]+', '(')
         self.regex_replace('\s+\)', ')')
 
-    def handle_eol_colon(self):
+    def handle_colon(self):
         '''Handle colons at the end of the line like in public:'''
-        self.regex_replace('\s:[^\S\n]+$', ':')
+        if 'class' in self.scope and self.start_of_statement:
+            self.repeated_regex_replace('^([^=\+\-/%\(]+) :', '\g<1>:')
 
     def handle_exponent(self):
         '''Handle exponents like 1.1e-1'''
@@ -231,7 +239,7 @@ class ScopeSetter(object):
             if line_part.type == StringReplacer.Normal:
                 self.new_line_part = ''
                 for char in line_part.text:
-                    if len(self.scope) > 0  and char == '{' and \
+                    if len(self.scope) > 0 and char == '{' and \
                        self.scope[-1] == 'initializer list':
                         # We added a : scope that we need to remove
                         self.new_line_part += char
@@ -276,7 +284,6 @@ class ScopeSetter(object):
                     elif char == ':' and self.last_char == ')':
                         self.new_line_part += char
                         self.add_line_part()
-                        self.start_of_statement = False
                         self.scope.append('initializer list')
                     elif char == ';':
                         self.new_line_part += char
@@ -416,12 +423,12 @@ def reformat(text_in, base_scope=None, set_indent=False):
         for op in ops:
             line_part.replace(op, ' '+op+' ')
             line_part.replace('  '+op, ' '+op)
-            line_part.replace(op+'  ', op+' ')
+            line_part.repeated_replace(op+'  ', op+' ')
 
         # Remove spaces around ::
         line_part.replace(' : : ', '::')
 
-        line_part.handle_eol_colon()
+        line_part.handle_colon()
 
         line_part.handle_increment_and_decrement_operator()
 
