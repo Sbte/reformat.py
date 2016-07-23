@@ -105,6 +105,10 @@ def test_multiplication_operator():
     assert out == 'f((a * b) * c)'
     out = reformat.reformat('f("a", b*c)', 1)
     assert out == 'f("a", b * c)'
+    out = reformat.reformat('''f("a",
+  b*c)''', 1)
+    assert out == '''f("a",
+  b * c)'''
 
 def test_and_operator():
     out = reformat.reformat('a = b & c;', 1)
@@ -187,6 +191,10 @@ def test_references():
     assert out == 'f(&(a))'
     out = reformat.reformat('A &f(int &a, int &b)')
     assert out == 'A &f(int &a, int &b)'
+    out = reformat.reformat('''A &f(int &a,
+     int &b)''')
+    assert out == '''A &f(int &a,
+     int &b)'''
 
 def test_classes():
     out = reformat.reformat('class A { int *f(int *a);};')
@@ -216,6 +224,7 @@ public:
 {
 public:
     A f(int const &a, int const &b);
+    B f(int const &a, int const &b);
 };'''
     out = reformat.reformat(code)
     assert out == code
@@ -231,6 +240,8 @@ public:
 };'''
     out = reformat.reformat(code)
     assert out == code
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
 
 def test_exponent():
     out = reformat.reformat('1e-5')
@@ -243,6 +254,8 @@ def test_exponent():
 def test_if_statement():
     out = reformat.reformat('if (a != b) c;')
     assert out == 'if (a != b) c;'
+    out = reformat.reformat('if (a) * b = c;', 1)
+    assert out == 'if (a) *b = c;'
 
 def test_for_statement():
     out = reformat.reformat('for(int i=0;i<c;++i) a;')
@@ -251,6 +264,15 @@ def test_for_statement():
     assert out == 'for (int i = 0; i < c; ++i)'
     out = reformat.reformat('for ( int i = 0 ; i < c ; ++i ) ')
     assert out == 'for (int i = 0; i < c; ++i)'
+    code = '''for (int i = 0; i < c; ++i)
+{
+    f();
+}
+a = g();'''
+    out = reformat.reformat(code)
+    assert out == code
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
 
 def test_return_statement():
     out = reformat.reformat('return a;')

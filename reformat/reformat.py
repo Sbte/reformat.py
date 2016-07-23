@@ -76,7 +76,7 @@ class StringReplacer(object):
             self.regex_replace('^( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>'+pointer_type+'\g<2>')
 
         # Pointers in function definitions and the global scope
-        if self.is_global_scope() and self.start_of_statement:
+        if self.is_global_scope():
             self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
@@ -181,6 +181,10 @@ class StringReplacer(object):
         # but function definitions are)
         scopes += ('class' in self.scope or 'struct' in self.scope) and \
                   not self.text.rstrip().endswith(':')
+
+        # If a statement spans multiple lines we indent
+        if not self.start_of_statement:
+            scopes += 1
         self.indentation = "    " * scopes
 
     def __str__(self):
@@ -236,7 +240,6 @@ class ScopeSetter(object):
 
     def parse(self):
         '''Parse the line_parts list that was set in the constructor'''
-        brackets = {'{': '}', '(': ')'}
 
         self.start_of_statement = True
         for line_part in self.line_parts:
@@ -252,7 +255,14 @@ class ScopeSetter(object):
                         self.scope.pop()
                         self.scope.append(char)
                         self.scope_keyword = ''
-                    elif char in brackets.iterkeys():
+                    elif char == '(':
+                        self.new_line_part += char
+                        self.add_line_part()
+                        self.scope.append(self.scope_keyword or char)
+                        self.scope_keyword = ''
+                    elif char == '{':
+                        self.add_line_part()
+                        self.start_of_statement = True
                         self.new_line_part += char
                         self.add_line_part()
                         self.scope.append(self.scope_keyword or char)
@@ -262,6 +272,7 @@ class ScopeSetter(object):
                         self.scope.pop()
                         self.scope_keyword = ''
                         self.new_line_part += char
+                        self.add_line_part()
                     elif char == ')':
                         self.new_line_part += char
                         self.add_line_part()
@@ -308,8 +319,18 @@ class ScopeSetter(object):
                         if re.match('\W+'+keyword+'\W$', self.new_line_part) or \
                            re.match('^'+keyword+'\W$', self.new_line_part):
                             self.scope_keyword = keyword
+
+                    for keyword in ['private', 'protected', 'public']:
+                        if re.match('^'+keyword+':$', self.new_line_part):
+                            self.add_line_part()
                 if self.new_line_part:
+                    new_line_part = self.new_line_part
                     self.add_line_part()
+
+                    # There was stuff on this line that
+                    # continues on the next line
+                    if new_line_part.rstrip():
+                        self.start_of_statement = False
             else:
                 line_part.scope = list(self.scope)
                 self.new_line_parts.append(line_part)
@@ -386,12 +407,12 @@ def reformat(text_in, base_scope=None, set_indent=False):
                 line_part = orig_line[pos-1:]
                 break
 
-            if line_part.endswith('#pragma'):
+            if line_part.lstrip() == '#':
                 line_parts.append(StringReplacer(
-                    line_part[:-7], line_type[-1], first))
+                    line_part[:-1], line_type[-1], first))
                 line_type.append(StringReplacer.Comment)
                 first = False
-                line_part = orig_line[pos-6:]
+                line_part = orig_line[pos:]
                 break
 
             if line_part.endswith('[') and is_normal_line_type(line_type):
