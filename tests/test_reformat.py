@@ -293,6 +293,18 @@ void f(int *a)
     assert out == code
     out = reformat.reformat(code, set_indent=True)
     assert out == code
+    code = '''namespace A
+    {
+    class B;
+    }'''
+    out = reformat.reformat(code)
+    assert out == code
+    expected = '''namespace A
+{
+class B;
+}'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == expected
 
 def test_brackets():
     out = reformat.reformat('( a )')

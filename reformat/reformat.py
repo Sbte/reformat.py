@@ -360,13 +360,15 @@ def reformat(text_in, base_scope=None, set_indent=False):
 
     line_parts = []
     for line_num, line in enumerate(lines):
-        orig_line = line
+        if set_indent and line.strip():
+            line = line.lstrip()
+
         line_part = ''
         if line_type[-1] == StringReplacer.Comment:
             line_type.pop()
 
         first = True
-        for pos, char in enumerate(orig_line):
+        for pos, char in enumerate(line):
             line_part += char
 
             if line_type[-1] == StringReplacer.MultilineComment:
@@ -404,7 +406,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
                     line_part[:-2], line_type[-1], first))
                 line_type.append(StringReplacer.Comment)
                 first = False
-                line_part = orig_line[pos-1:]
+                line_part = line[pos-1:]
                 break
 
             if line_part.lstrip() == '#':
@@ -412,7 +414,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
                     line_part[:-1], line_type[-1], first))
                 line_type.append(StringReplacer.Comment)
                 first = False
-                line_part = orig_line[pos:]
+                line_part = line[pos:]
                 break
 
             if line_part.endswith('[') and is_normal_line_type(line_type):
