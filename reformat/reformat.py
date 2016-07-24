@@ -27,7 +27,7 @@ class StringReplacer(object):
         self.after_bracket = False
 
         if scope:
-            self.scope = list(scope)
+            self.scope = scope
         else:
             self.scope = []
 
@@ -176,6 +176,12 @@ class StringReplacer(object):
             return
 
         self.text = self.text.lstrip()
+
+        # Allign with brackets
+        if len(self.scope) and '(' in self.scope[-1]:
+            self.indentation = self.scope[-1]['('] * ' '
+            return
+
         scopes = num_scopes(self.scope)
         # Class definitions (public is not indented,
         # but function definitions are)
@@ -213,6 +219,8 @@ class ScopeSetter(object):
         if base_scope:
             if isinstance(base_scope, list):
                 self.scope = base_scope
+            elif isinstance(base_scope, int):
+                self.scope = [''] * base_scope
             else:
                 self.scope = [base_scope]
 
@@ -222,6 +230,14 @@ class ScopeSetter(object):
         self.start_of_statement = True
         self.start_of_line = True
         self.after_bracket = False
+
+    def pop_scope(self):
+        self.scope = list(self.scope)
+        self.scope.pop()
+
+    def add_scope(self, item):
+        self.scope = list(self.scope)
+        self.scope.append(item)
 
     def add_line_part(self):
         '''Add a new line part to the new_line_parts list'''
@@ -252,24 +268,24 @@ class ScopeSetter(object):
                         # We added a : scope that we need to remove
                         self.new_line_part += char
                         self.add_line_part()
-                        self.scope.pop()
-                        self.scope.append(char)
+                        self.pop_scope()
+                        self.add_scope(char)
                         self.scope_keyword = ''
                     elif char == '(':
                         self.new_line_part += char
                         self.add_line_part()
-                        self.scope.append(self.scope_keyword or char)
+                        self.add_scope(self.scope_keyword or char)
                         self.scope_keyword = ''
                     elif char == '{':
                         self.add_line_part()
                         self.start_of_statement = True
                         self.new_line_part += char
                         self.add_line_part()
-                        self.scope.append(self.scope_keyword or char)
+                        self.add_scope(self.scope_keyword or char)
                         self.scope_keyword = ''
                     elif char == '}':
                         self.add_line_part()
-                        self.scope.pop()
+                        self.pop_scope()
                         self.scope_keyword = ''
                         self.new_line_part += char
                         self.add_line_part()
@@ -281,7 +297,7 @@ class ScopeSetter(object):
                         else:
                             self.start_of_statement = False
                         self.after_bracket = True
-                        self.scope.pop()
+                        self.pop_scope()
                         self.scope_keyword = ''
                     elif len(self.scope) > 0 and self.scope[-1]  == 'initializer list' and char == ';':
                         # Remove the initializer list scope from all previous scopes
@@ -300,7 +316,7 @@ class ScopeSetter(object):
                     elif char == ':' and self.last_char == ')':
                         self.new_line_part += char
                         self.add_line_part()
-                        self.scope.append('initializer list')
+                        self.add_scope('initializer list')
                     elif char == ';':
                         self.new_line_part += char
                         self.add_line_part()
@@ -332,7 +348,7 @@ class ScopeSetter(object):
                     if new_line_part.rstrip():
                         self.start_of_statement = False
             else:
-                line_part.scope = list(self.scope)
+                line_part.scope = self.scope
                 self.new_line_parts.append(line_part)
                 if line_part.type == StringReplacer.Comment:
                     self.start_of_statement = True
@@ -343,6 +359,8 @@ class ScopeSetter(object):
         if self.base_scope:
             if isinstance(self.base_scope, list):
                 assert self.scope == self.base_scope
+            elif isinstance(self.base_scope, int):
+                assert self.scope == [''] * self.base_scope
             else:
                 assert self.scope == [self.base_scope]
         else:
@@ -442,6 +460,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
     line_parts = set_scopes.parse()
 
     text = ''
+    pos = 0
     for line_part in line_parts:
         if line_part.type not in [StringReplacer.Normal, StringReplacer.Index]:
             text += str(line_part)
@@ -508,7 +527,16 @@ def reformat(text_in, base_scope=None, set_indent=False):
         line_part.replace('include<', 'include <')
 
         if set_indent:
+            if len(line_part.scope) and '(' in line_part.scope[-1] \
+               and not isinstance(line_part.scope[-1], dict):
+                line_part.scope[-1] = {'(': pos}
+
             line_part.set_indenting()
+
+            if line_part.start_of_line:
+                pos = len(str(line_part))
+            else:
+                pos += len(str(line_part))
 
         text += str(line_part)
 
