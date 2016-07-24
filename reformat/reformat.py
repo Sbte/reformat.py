@@ -360,7 +360,8 @@ def reformat(text_in, base_scope=None, set_indent=False):
 
     line_parts = []
     for line_num, line in enumerate(lines):
-        if set_indent and line.strip():
+        if set_indent and line.strip() and \
+           line_type[-1] != StringReplacer.MultilineComment:
             line = line.lstrip()
 
         line_part = ''

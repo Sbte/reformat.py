@@ -330,9 +330,11 @@ def test_initializer_lists():
 
 def test_multiline_comments():
     code = '''/*
-s*v)23a87+v"asd{"
+   s*v)23a87+v"asd{"
 */'''
     out = reformat.reformat(code)
+    assert out == code
+    out = reformat.reformat(code, set_indent=True)
     assert out == code
 
 def test_initializer_lists():
