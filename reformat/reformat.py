@@ -204,6 +204,8 @@ class StringReplacer(object):
         scopes += ('class' in self.scope or 'struct' in self.scope) and \
                   not self.text.rstrip() in ['private:', 'protected:', 'public:']
 
+        scopes -= 'initializer list' in self.scope
+
         # If a statement spans multiple lines we indent
         if not self.start_of_statement:
             scopes += 1
@@ -260,15 +262,18 @@ class ScopeSetter(object):
         if self.new_line_part == '':
             return
 
+        new_line_part = self.new_line_part
+
         self.new_line_parts.append(StringReplacer(
             self.new_line_part, StringReplacer.Normal, self.start_of_line, self.scope))
         self.new_line_parts[-1].start_of_statement = self.start_of_statement
         self.new_line_parts[-1].after_bracket = self.after_bracket
         self.new_line_part = ''
 
-        self.start_of_statement = True
-        self.start_of_line = False
-        self.after_bracket = False
+        if new_line_part.strip():
+            self.start_of_statement = True
+            self.start_of_line = False
+            self.after_bracket = False
 
     def parse(self):
         '''Parse the line_parts list that was set in the constructor'''
@@ -282,6 +287,8 @@ class ScopeSetter(object):
                     if len(self.scope) > 0 and char == '{' and \
                        self.scope[-1] == 'initializer list':
                         # We added a : scope that we need to remove
+                        self.add_line_part()
+                        self.start_of_statement = True
                         self.new_line_part += char
                         self.add_line_part()
                         self.pop_scope()
@@ -327,9 +334,12 @@ class ScopeSetter(object):
                         self.new_line_part += char
                         self.add_line_part()
                     elif char == ':' and self.last_char == ')':
+                        self.add_line_part()
+                        self.start_of_statement = True
                         self.new_line_part += char
                         self.add_line_part()
                         self.add_scope('initializer list')
+                        self.start_of_statement = False
                     elif char == ';':
                         self.new_line_part += char
                         self.add_line_part()

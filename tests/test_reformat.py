@@ -326,10 +326,24 @@ a &f(b);'''
 def test_initializer_lists():
     code = '''A::A(int &a, int &b)
 :
-    a_(a * b)
-{}'''
+    a_(a * b),
+    b_(a * b)
+{
+    f(a);
+}'''
     out = reformat.reformat(code)
     assert out == code
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
+    code = '''A::A(int &a, int &b)
+: a_(a * b)
+{}'''
+    expected = '''A::A(int &a, int &b)
+:
+    a_(a * b)
+{}'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == expected
 
 def test_multiline_comments():
     code = '''/*
