@@ -186,7 +186,7 @@ class StringReplacer(object):
         # Class definitions (public is not indented,
         # but function definitions are)
         scopes += ('class' in self.scope or 'struct' in self.scope) and \
-                  not self.text.rstrip().endswith(':')
+                  not self.text.rstrip() in ['private:', 'protected:', 'public:']
 
         # If a statement spans multiple lines we indent
         if not self.start_of_statement:
@@ -347,10 +347,6 @@ class ScopeSetter(object):
             else:
                 line_part.scope = self.scope
                 self.new_line_parts.append(line_part)
-                if line_part.type == StringReplacer.Comment:
-                    self.start_of_statement = True
-                else:
-                    self.start_of_statement = False
 
         # All scopes should be closed at the end of the file
         if self.base_scope:
@@ -421,7 +417,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
                 line_parts.append(StringReplacer(
                     line_part[:-2], line_type[-1], first))
                 line_type.append(StringReplacer.Comment)
-                first = False
+                first = True
                 line_part = line[pos-1:]
                 break
 
@@ -429,7 +425,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
                 line_parts.append(StringReplacer(
                     line_part[:-1], line_type[-1], first))
                 line_type.append(StringReplacer.Comment)
-                first = False
+                first = True
                 line_part = line[pos:]
                 break
 
@@ -460,6 +456,9 @@ def reformat(text_in, base_scope=None, set_indent=False):
     pos = 0
     for line_part in line_parts:
         if line_part.type not in [StringReplacer.Normal, StringReplacer.Index]:
+            if set_indent and line_part.type not in [StringReplacer.MultilineComment]:
+                line_part.set_indenting()
+
             text += str(line_part)
             continue
 
