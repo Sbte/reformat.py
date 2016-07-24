@@ -405,10 +405,11 @@ def reformat(text_in, base_scope=None, set_indent=False):
                     continue
 
             if line_part.endswith('/*'):
-                line_parts.append(StringReplacer(
-                    line_part[:-2], line_type[-1], first))
+                if len(line_part) > 2:
+                    line_parts.append(StringReplacer(
+                        line_part[:-2], line_type[-1], first))
+                    first = False
                 line_type.append(StringReplacer.MultilineComment)
-                first = False
                 line_part = '/*'
                 continue
 
@@ -425,18 +426,20 @@ def reformat(text_in, base_scope=None, set_indent=False):
                 continue
 
             if line_part.endswith('//'):
-                line_parts.append(StringReplacer(
-                    line_part[:-2], line_type[-1], first))
+                if len(line_part) > 2:
+                    line_parts.append(StringReplacer(
+                        line_part[:-2], line_type[-1], first))
+                    first = False
                 line_type.append(StringReplacer.Comment)
-                first = True
                 line_part = line[pos-1:]
                 break
 
             if line_part.lstrip() == '#':
-                line_parts.append(StringReplacer(
-                    line_part[:-1], line_type[-1], first))
+                if len(line_part) > 1:
+                    line_parts.append(StringReplacer(
+                        line_part[:-1], line_type[-1], first))
+                    first = False
                 line_type.append(StringReplacer.Comment)
-                first = True
                 line_part = line[pos:]
                 break
 
