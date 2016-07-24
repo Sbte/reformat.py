@@ -5,8 +5,11 @@ import re
 def num_scopes(scope):
     scopes = 0
     for s in scope:
-        if s not in ('namespace', 'struct', 'class', '('):
-            scopes += 1
+        counts = 1
+        for k in ('namespace', 'struct', 'class', '('):
+            if k in s:
+                counts = 0
+        scopes += counts
     return scopes
 
 def is_global_scope(scope):
@@ -80,9 +83,17 @@ class StringReplacer(object):
             self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
-        if self.start_of_statement and not '(' in self.scope and \
-           (len(self.scope) and not self.scope[-1] in self.keywords):
-            self.repeated_regex_replace('^([^=\+\-/%\(]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
+        if self.start_of_statement:
+            counts = True
+            for s in self.scope:
+                if '(' in s:
+                    counts = False
+            if len(self.scope) and self.scope[-1] in self.keywords:
+                counts = False
+            if counts:
+                self.repeated_regex_replace(
+                    '^([^=\+\-/%\(]+)'+escaped_pointer_type+' ',
+                    '\g<1>'+pointer_type)
 
         # Put back spaces when an operator with more than 1 char was before
         # the *

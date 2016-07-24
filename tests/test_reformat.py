@@ -362,6 +362,14 @@ def test_bracket_alignment():
     out = reformat.reformat(code, 1, set_indent=True)
     assert out == code
 
+def test_default_values():
+    code = '''f(int a = 2,
+  int *b = NULL);'''
+    out = reformat.reformat(code)
+    assert out == code
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
+
 @pytest.mark.xfail
 def test_pointers_that_are_not_pointers():
     '''This is something that also doesn't work in astyle'''
