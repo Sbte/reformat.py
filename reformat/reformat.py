@@ -188,6 +188,11 @@ class StringReplacer(object):
 
         self.text = self.text.lstrip()
 
+        # Defines
+        if self.text.startswith('#'):
+            self.indentation = ''
+            return
+
         # Allign with brackets
         if len(self.scope) and '(' in self.scope[-1]:
             self.indentation = self.scope[-1]['('] * ' '

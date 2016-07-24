@@ -353,6 +353,10 @@ def test_pragma():
     out = reformat.reformat(code)
     assert out == code
 
+def test_define():
+    out = reformat.reformat('    #ifdef DEBUG', 1, set_indent=True)
+    assert out == '#ifdef DEBUG'
+
 def test_bracket_alignment():
     code = '''
     f(a,
