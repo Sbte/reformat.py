@@ -299,15 +299,12 @@ class ScopeSetter(object):
                         self.after_bracket = True
                         self.pop_scope()
                         self.scope_keyword = ''
-                    elif len(self.scope) > 0 and self.scope[-1]  == 'initializer list' and char == ';':
-                        # Remove the initializer list scope from all previous scopes
-                        for i in xrange(len(self.new_line_parts)-1, -1, -1):
-                            part = self.new_line_parts[i]
-                            if 'initializer list' not in part.scope:
-                                break
-                            while 'initializer list' in part.scope:
-                                part.scope.remove('initializer list')
+                    elif len(self.scope) > 0 and \
+                         self.scope[-1] == 'initializer list' and \
+                         char == ';':
+                        self.scope_keyword = ''
                         self.new_line_part += char
+                        self.pop_scope()
                         self.add_line_part()
                     elif self.scope_keyword and char == ';':
                         self.scope_keyword = ''
