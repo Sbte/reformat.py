@@ -241,6 +241,7 @@ class ScopeSetter(object):
                 self.scope = [''] * base_scope
             else:
                 self.scope = [base_scope]
+        self.scopes = [self.scope]
 
         self.scope_keyword = ''
         self.last_char = ''
@@ -250,12 +251,13 @@ class ScopeSetter(object):
         self.after_bracket = False
 
     def pop_scope(self):
-        self.scope = list(self.scope)
-        self.scope.pop()
+        self.scopes.pop()
+        self.scope = self.scopes[-1]
 
     def add_scope(self, item):
         self.scope = list(self.scope)
         self.scope.append(item)
+        self.scopes.append(self.scope)
 
     def add_line_part(self):
         '''Add a new line part to the new_line_parts list'''
