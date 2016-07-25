@@ -21,6 +21,7 @@ class StringReplacer(object):
     Comment = 2
     MultilineComment = 3
     Index = 4
+    EOL = 5
 
     def __init__(self, text, type, first = True, scope = None):
         self.text = text
@@ -103,7 +104,7 @@ class StringReplacer(object):
     def handle_templates(self):
         '''Handle C++ templates'''
         # Templates and includes should not have spaces
-        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>[^\S\n]*', '<\g<1>\g<2>> ')
+        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>\s*', '<\g<1>\g<2>> ')
 
         # Template members
         self.replace('> ::', '>::')
@@ -116,9 +117,9 @@ class StringReplacer(object):
 
         # Handle spaces after a bracket
         if self.after_bracket:
-            self.regex_replace('^[^\S\n]*([^\(])', ' \g<1>')
+            self.regex_replace('^\s*([^\(])', ' \g<1>')
 
-        self.regex_replace('\([^\S\n]+', '(')
+        self.regex_replace('\(\s+', '(')
         self.regex_replace('\s+\)', ')')
 
     def handle_colon(self):
@@ -166,7 +167,7 @@ class StringReplacer(object):
         '''Handle punctuation like . , ;'''
         # Put spaces after , and ;
         for op in [',', ';']:
-            self.regex_replace(re.escape(op)+'[^\S\n]*', op+' ')
+            self.regex_replace(re.escape(op)+'\s*', op+' ')
 
         # Remove spaces before , ; .
         for op in [',', ';', '.']:
@@ -174,7 +175,7 @@ class StringReplacer(object):
 
         # Remove spaces after .
         for op in ['.']:
-            self.regex_replace(re.escape(op)+'[^\S\n]+', op)
+            self.regex_replace(re.escape(op)+'\s+', op)
 
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
@@ -182,8 +183,7 @@ class StringReplacer(object):
             return
 
         # Handle empty lines
-        if self.text.endswith('\n') and self.text.lstrip() == '':
-            self.text = '\n'
+        if self.type == self.EOL:
             return
 
         self.text = self.text.lstrip()
@@ -212,7 +212,9 @@ class StringReplacer(object):
         self.indentation = "    " * scopes
 
     def __str__(self):
-        if self.start_of_line:
+        if self.type == self.EOL:
+            return '\n'
+        elif self.start_of_line:
             return self.indentation + self.text.lstrip()
         else:
             return self.text
@@ -475,7 +477,12 @@ def reformat(text_in, base_scope=None, set_indent=False):
                 line_part = ''
                 continue
 
-        line_parts.append(StringReplacer(line_part, line_type[-1], first))
+        if line_part.rstrip():
+            line_parts.append(StringReplacer(line_part.rstrip(),
+                                             line_type[-1], first))
+            first = False
+        if line_part.endswith('\n'):
+            line_parts.append(StringReplacer('', StringReplacer.EOL, first))
 
     # Check that we popped all other line_types
     # assert line_type == [StringReplacer.Normal]
@@ -542,13 +549,13 @@ def reformat(text_in, base_scope=None, set_indent=False):
         line_part.regex_replace('^ //', '//')
 
         if line_part.start_of_statement and not line_part.start_of_line:
-            line_part.regex_replace('^[^\S\n]+', '')
+            line_part.regex_replace('^\s+', '')
 
         line_part.handle_brackets()
         line_part.handle_punctuation()
 
         # Pointer dereference ->
-        line_part.regex_replace('\s*\-\s*>[^\S\n]*', '->')
+        line_part.regex_replace('\s*\-\s*>\s*', '->')
 
         # Includes should have a space
         line_part.replace('include<', 'include <')
