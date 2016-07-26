@@ -2,16 +2,66 @@ import sys
 import os
 import re
 
-class Scope(list):
+class Scope(object):
     def __init__(self, initial = None):
-        list.__init__(self)
+        self.nested_list = []
+        self.length = 0
         if initial:
             if isinstance(initial, list):
-                self.extend(initial)
+                self.nested_list = initial
             elif isinstance(initial, int):
-                self.extend([''] * initial)
+                for i in xrange(initial):
+                    self.append('')
+            elif isinstance(initial, Scope):
+                self.nested_list = initial.nested_list
+                self.length = initial.length
             else:
                 self.append(initial)
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, index):
+        nested_list = self.nested_list
+
+        if index < 0:
+            for i in xrange(-index):
+                item = nested_list[1]
+                nested_list = nested_list[0]
+        else:
+            for i in xrange(self.length-index):
+                item = nested_list[1]
+                nested_list = nested_list[0]
+
+        return item
+
+    def __setitem__(self, index, item):
+        nested_list = self.nested_list
+
+        if index < 0:
+            for i in xrange(-index-1):
+                nested_list = nested_list[0]
+        else:
+            for i in xrange(self.length-index-1):
+                nested_list = nested_list[0]
+        nested_list[1] = item
+
+    def __iter__(self):
+        nested_list = self.nested_list
+        for i in xrange(self.length):
+            item = nested_list[1]
+            nested_list = nested_list[0]
+            yield item
+
+    def append(self, item):
+        self.nested_list = [self.nested_list, item]
+        self.length += 1
+
+    def pop(self):
+        item = self.nested_list[1]
+        self.nested_list = self.nested_list[0]
+        self.length -= 1
+        return item
 
     def indented_scopes(self):
         scopes = 0
@@ -379,16 +429,16 @@ class ScopeSetter(object):
                 line_part.scope = self.scope
                 self.new_line_parts.append(line_part)
 
-        # All scopes should be closed at the end of the file
-        if self.base_scope:
-            if isinstance(self.base_scope, list):
-                assert self.scope == self.base_scope
-            elif isinstance(self.base_scope, int):
-                assert self.scope == [''] * self.base_scope
-            else:
-                assert self.scope == [self.base_scope]
-        else:
-            assert self.scope == []
+        # # All scopes should be closed at the end of the file
+        # if self.base_scope:
+        #     if isinstance(self.base_scope, list):
+        #         assert self.scope == self.base_scope
+        #     elif isinstance(self.base_scope, int):
+        #         assert self.scope == [''] * self.base_scope
+        #     else:
+        #         assert self.scope == [self.base_scope]
+        # else:
+        #     assert self.scope == []
 
         return self.new_line_parts
 
