@@ -15,6 +15,17 @@ def num_scopes(scope):
 def is_global_scope(scope):
     return not num_scopes(scope)
 
+class Scope(list):
+    def __init__(self, initial = None):
+        list.__init__(self)
+        if initial:
+            if isinstance(initial, list):
+                self.extend(initial)
+            elif isinstance(initial, int):
+                self.extend([''] * initial)
+            else:
+                self.append(initial)
+
 class StringReplacer(object):
     Normal = 0
     String = 1
@@ -30,10 +41,10 @@ class StringReplacer(object):
         self.start_of_statement = first
         self.after_bracket = False
 
-        if scope:
+        if isinstance(scope, Scope):
             self.scope = scope
         else:
-            self.scope = []
+            self.scope = Scope(scope)
 
         self.keywords = ['for', 'if', 'while', 'return']
 
@@ -234,15 +245,8 @@ class ScopeSetter(object):
         self.line_parts = line_parts
         self.new_line_parts = []
 
-        self.scope = []
+        self.scope = Scope(base_scope)
         self.base_scope = base_scope
-        if base_scope:
-            if isinstance(base_scope, list):
-                self.scope = base_scope
-            elif isinstance(base_scope, int):
-                self.scope = [''] * base_scope
-            else:
-                self.scope = [base_scope]
         self.scopes = [self.scope]
 
         self.scope_keyword = ''
@@ -257,7 +261,7 @@ class ScopeSetter(object):
         self.scope = self.scopes[-1]
 
     def add_scope(self, item):
-        self.scope = list(self.scope)
+        self.scope = Scope(self.scope)
         self.scope.append(item)
         self.scopes.append(self.scope)
 
