@@ -2,19 +2,6 @@ import sys
 import os
 import re
 
-def num_scopes(scope):
-    scopes = 0
-    for s in scope:
-        counts = 1
-        for k in ('namespace', 'struct', 'class', '('):
-            if k in s:
-                counts = 0
-        scopes += counts
-    return scopes
-
-def is_global_scope(scope):
-    return not num_scopes(scope)
-
 class Scope(list):
     def __init__(self, initial = None):
         list.__init__(self)
@@ -25,6 +12,19 @@ class Scope(list):
                 self.extend([''] * initial)
             else:
                 self.append(initial)
+
+    def indented_scopes(self):
+        scopes = 0
+        for s in self:
+            counts = 1
+            for k in ('namespace', 'struct', 'class', '('):
+                if k in s:
+                    counts = 0
+            scopes += counts
+        return scopes
+
+    def is_global(self):
+        return not self.indented_scopes()
 
 class StringReplacer(object):
     Normal = 0
@@ -74,9 +74,6 @@ class StringReplacer(object):
             text = self.text
             self.regex_replace(search, replace)
 
-    def is_global_scope(self):
-        return is_global_scope(self.scope)
-
     def handle_pointers(self, pointer_type='*'):
         '''Handles pointers in C-type languages'''
         escaped_pointer_type = re.escape(pointer_type)
@@ -91,7 +88,7 @@ class StringReplacer(object):
             self.regex_replace('^( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>'+pointer_type+'\g<2>')
 
         # Pointers in function definitions and the global scope
-        if self.is_global_scope():
+        if self.scope.is_global():
             self.repeated_regex_replace('^([^=\+\-/%]+)'+escaped_pointer_type+' ', '\g<1>'+pointer_type)
 
         # lvalue pointers, up to any operator or bracket
@@ -209,7 +206,7 @@ class StringReplacer(object):
             self.indentation = self.scope[-1]['('] * ' '
             return
 
-        scopes = num_scopes(self.scope)
+        scopes = self.scope.indented_scopes()
         # Class definitions (public is not indented,
         # but function definitions are)
         scopes += ('class' in self.scope or 'struct' in self.scope) and \
