@@ -387,6 +387,17 @@ def test_bracket_alignment():
     assert out == code
     out = reformat.reformat(code, 1, set_indent=True)
     assert out == code
+    code = '''
+    freallylongname(
+        freallylongname(
+            Atype
+                reallylongconstructorname(
+                    a)));'''
+    out = reformat.reformat(code, 1)
+    assert out == code
+    out = reformat.reformat(code, 1, set_indent=True)
+    assert out == code
+
 
 def test_default_values():
     code = '''f(int a = 2,

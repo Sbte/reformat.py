@@ -67,7 +67,7 @@ class Scope(object):
         scopes = 0
         for s in self:
             counts = 1
-            for k in ('namespace', 'struct', 'class', '('):
+            for k in ('namespace', 'struct', 'class', '(', 'continuation'):
                 if k in s:
                     counts = 0
             scopes += counts
@@ -75,6 +75,22 @@ class Scope(object):
 
     def is_global(self):
         return not self.indented_scopes()
+
+    def get_last(self):
+        if not len(self):
+            return None
+
+        for s in reversed(self):
+            if s != 'continuation':
+                return s
+
+    def set_last(self, item):
+        for i in xrange(len(self)-1, -1, -1):
+            if self.__getitem__(i) != 'continuation':
+                self.__setitem__(i, item)
+                return
+
+    last = property(get_last, set_last)
 
 class StringReplacer(object):
     Normal = 0
@@ -147,7 +163,7 @@ class StringReplacer(object):
             for s in self.scope:
                 if '(' in s:
                     counts = False
-            if len(self.scope) and self.scope[-1] in self.keywords:
+            if len(self.scope) and self.scope.last in self.keywords:
                 counts = False
             if counts:
                 self.repeated_regex_replace(
@@ -251,22 +267,30 @@ class StringReplacer(object):
             self.indentation = ''
             return
 
-        # Allign with brackets
-        if len(self.scope) and '(' in self.scope[-1]:
-            self.indentation = self.scope[-1]['('] * ' '
-            return
-
         scopes = self.scope.indented_scopes()
+
+        # Align with brackets
+        for s in reversed(self.scope):
+            aligned = True
+            if '(' in s:
+                if isinstance(s, dict) and s['('] > 0:
+                    if not aligned:
+                        continue
+                    self.indentation = s['('] * ' '
+                    return
+                else: 
+                    aligned = False
+                    scopes += 1
+
         # Class definitions (public is not indented,
         # but function definitions are)
-        scopes += ('class' in self.scope or 'struct' in self.scope) and \
-                  not self.text.rstrip() in ['private:', 'protected:', 'public:']
+        for s in ('class', 'struct', 'continuation'):
+            if s in self.scope and not self.text.rstrip() in \
+               ['private:', 'protected:', 'public:']:
+                scopes += 1
 
         scopes -= 'initializer list' in self.scope
 
-        # If a statement spans multiple lines we indent
-        if not self.start_of_statement:
-            scopes += 1
         self.indentation = "    " * scopes
 
     def __str__(self):
@@ -303,7 +327,10 @@ class ScopeSetter(object):
         self.start_of_line = True
         self.after_bracket = False
 
-    def pop_scope(self):
+    def pop_scope(self, continuation=False):
+        if not continuation and self.scope[-1] == 'continuation':
+            self.scopes.pop()
+
         self.scopes.pop()
         self.scope = self.scopes[-1]
 
@@ -312,12 +339,21 @@ class ScopeSetter(object):
         self.scope.append(item)
         self.scopes.append(self.scope)
 
-    def add_line_part(self):
+    def add_line_part(self, closing = False):
         '''Add a new line part to the new_line_parts list'''
         if self.new_line_part == '':
             return
 
         new_line_part = self.new_line_part
+
+        # Add scope when a line continues fro mthe last line
+        if self.start_of_line and not self.start_of_statement and \
+           not closing and \
+           (not len(self.scope) or self.scope[-1] != 'continuation'):
+            self.add_scope('continuation')
+        elif closing and len(self.scope) and self.scope[-1] == 'continuation':
+            self.pop_scope(True)
+
 
         self.new_line_parts.append(StringReplacer(
             self.new_line_part, StringReplacer.Normal, self.start_of_line, self.scope))
@@ -325,7 +361,7 @@ class ScopeSetter(object):
         self.new_line_parts[-1].after_bracket = self.after_bracket
         self.new_line_part = ''
 
-        if new_line_part.strip():
+        if new_line_part.strip() or closing:
             self.start_of_statement = True
             self.start_of_line = False
             self.after_bracket = False
@@ -340,12 +376,11 @@ class ScopeSetter(object):
                 self.new_line_part = ''
                 for char in line_part.text:
                     if len(self.scope) > 0 and char == '{' and \
-                       self.scope[-1] == 'initializer list':
+                       'initializer list' in self.scope:
                         # We added a : scope that we need to remove
-                        self.add_line_part()
-                        self.start_of_statement = True
+                        self.add_line_part(True)
                         self.new_line_part += char
-                        self.add_line_part()
+                        self.add_line_part(True)
                         self.pop_scope()
                         self.add_scope(char)
                         self.scope_keyword = ''
@@ -355,14 +390,13 @@ class ScopeSetter(object):
                         self.add_scope(self.scope_keyword or char)
                         self.scope_keyword = ''
                     elif char == '{':
-                        self.add_line_part()
-                        self.start_of_statement = True
+                        self.add_line_part(True)
                         self.new_line_part += char
-                        self.add_line_part()
+                        self.add_line_part(True)
                         self.add_scope(self.scope_keyword or char)
                         self.scope_keyword = ''
                     elif char == '}':
-                        self.add_line_part()
+                        self.add_line_part(True)
                         self.pop_scope()
                         self.scope_keyword = ''
                         self.new_line_part += char
@@ -370,7 +404,7 @@ class ScopeSetter(object):
                     elif char == ')':
                         self.new_line_part += char
                         self.add_line_part()
-                        if self.scope[-1] in line_part.keywords:
+                        if self.scope.last in line_part.keywords:
                             self.start_of_statement = True
                         else:
                             self.start_of_statement = False
@@ -378,16 +412,16 @@ class ScopeSetter(object):
                         self.pop_scope()
                         self.scope_keyword = ''
                     elif len(self.scope) > 0 and \
-                         self.scope[-1] == 'initializer list' and \
+                         self.scope.last == 'initializer list' and \
                          char == ';':
                         self.scope_keyword = ''
                         self.new_line_part += char
                         self.pop_scope()
-                        self.add_line_part()
+                        self.add_line_part(True)
                     elif self.scope_keyword and char == ';':
                         self.scope_keyword = ''
                         self.new_line_part += char
-                        self.add_line_part()
+                        self.add_line_part(True)
                     elif char == ':' and self.last_char == ')':
                         self.add_line_part()
                         self.start_of_statement = True
@@ -397,7 +431,7 @@ class ScopeSetter(object):
                         self.start_of_statement = False
                     elif char == ';':
                         self.new_line_part += char
-                        self.add_line_part()
+                        self.add_line_part(True)
                     else:
                         self.new_line_part += char
 
@@ -604,9 +638,13 @@ def reformat(text_in, base_scope=None, set_indent=False):
         line_part.replace('include<', 'include <')
 
         if set_indent:
-            if len(line_part.scope) and '(' in line_part.scope[-1] \
-               and not isinstance(line_part.scope[-1], dict):
-                line_part.scope[-1] = {'(': pos}
+            if line_part.scope.last and '(' in line_part.scope.last \
+               and not isinstance(line_part.scope.last, dict):
+                if line_part.start_of_line:
+                    # Bracket at the end of the line
+                    line_part.scope.last = {'(': -1}
+                else:
+                    line_part.scope.last = {'(': pos}
 
             line_part.set_indenting()
 
