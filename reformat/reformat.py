@@ -293,7 +293,7 @@ class ScopeSetter(object):
         self.new_line_parts = []
 
         self.scope = Scope(base_scope)
-        self.base_scope = base_scope
+        self.base_scope = Scope(base_scope)
         self.scopes = [self.scope]
 
         self.scope_keyword = ''
@@ -429,16 +429,8 @@ class ScopeSetter(object):
                 line_part.scope = self.scope
                 self.new_line_parts.append(line_part)
 
-        # # All scopes should be closed at the end of the file
-        # if self.base_scope:
-        #     if isinstance(self.base_scope, list):
-        #         assert self.scope == self.base_scope
-        #     elif isinstance(self.base_scope, int):
-        #         assert self.scope == [''] * self.base_scope
-        #     else:
-        #         assert self.scope == [self.base_scope]
-        # else:
-        #     assert self.scope == []
+        # All scopes should be closed at the end of the file
+        len(self.scope) == len(self.base_scope)
 
         return self.new_line_parts
 
