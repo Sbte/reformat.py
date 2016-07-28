@@ -169,6 +169,13 @@ def test_pointers():
     assert out == 'f(*a, *b)'
     out = reformat.reformat('A *f(int *a, int *b)')
     assert out == 'A *f(int *a, int *b)'
+    code = '''
+    f(*a,
+      *b);'''
+    out = reformat.reformat(code, 1)
+    assert out == code
+    out = reformat.reformat(code, 1, set_indent=True)
+    assert out == code
 
 def test_pointer_dereference():
     out = reformat.reformat('a->get();')
@@ -326,6 +333,15 @@ a &f(b);'''
 def test_initializer_lists():
     code = '''A::A(int &a, int &b)
 :
+    a_(a * b)
+{}'''
+    out = reformat.reformat(code)
+    assert out == code
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
+
+    code = '''A::A(int &a, int &b)
+:
     a_(a * b),
     b_(a * b)
 {
@@ -335,15 +351,6 @@ def test_initializer_lists():
     assert out == code
     out = reformat.reformat(code, set_indent=True)
     assert out == code
-    code = '''A::A(int &a, int &b)
-: a_(a * b)
-{}'''
-    expected = '''A::A(int &a, int &b)
-:
-    a_(a * b)
-{}'''
-    out = reformat.reformat(code, set_indent=True)
-    assert out == expected
 
 def test_multiline_comments():
     code = '''/*
@@ -352,14 +359,6 @@ def test_multiline_comments():
     out = reformat.reformat(code)
     assert out == code
     out = reformat.reformat(code, set_indent=True)
-    assert out == code
-
-def test_initializer_lists():
-    code = '''A::A(int &a, int &b)
-:
-    a_(a * b)
-{}'''
-    out = reformat.reformat(code)
     assert out == code
 
 def test_pragma():

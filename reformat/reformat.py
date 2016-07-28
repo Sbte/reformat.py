@@ -67,14 +67,21 @@ class Scope(object):
         scopes = 0
         for s in self:
             counts = 1
-            for k in ('namespace', 'struct', 'class', '(', 'continuation'):
+            for k in ('namespace', 'struct', 'class', '(', 'initializer list'):
                 if k in s:
                     counts = 0
             scopes += counts
         return scopes
 
     def is_global(self):
-        return not self.indented_scopes()
+        for s in self:
+            counts = True
+            for k in ('namespace', 'struct', 'class', '(', 'continuation'):
+                if k in s:
+                    counts = False
+            if counts:
+                return False
+        return True
 
     def get_last(self):
         if not len(self):
@@ -284,12 +291,13 @@ class StringReplacer(object):
 
         # Class definitions (public is not indented,
         # but function definitions are)
-        for s in ('class', 'struct', 'continuation'):
+        for s in ('class', 'struct'):
             if s in self.scope and not self.text.rstrip() in \
                ['private:', 'protected:', 'public:']:
                 scopes += 1
 
-        scopes -= 'initializer list' in self.scope
+        scopes -= self.text.strip() == ':' and \
+                  self.scope.last == 'initializer list'
 
         self.indentation = "    " * scopes
 
@@ -326,6 +334,7 @@ class ScopeSetter(object):
         self.start_of_statement = True
         self.start_of_line = True
         self.after_bracket = False
+        self.continuation = False
 
     def pop_scope(self, continuation=False):
         if not continuation and self.scope[-1] == 'continuation':
@@ -346,9 +355,8 @@ class ScopeSetter(object):
 
         new_line_part = self.new_line_part
 
-        # Add scope when a line continues fro mthe last line
-        if self.start_of_line and not self.start_of_statement and \
-           not closing and \
+        # Add scope when a line continues from the last line
+        if self.start_of_line and self.continuation and not closing and \
            (not len(self.scope) or self.scope[-1] != 'continuation'):
             self.add_scope('continuation')
         elif closing and len(self.scope) and self.scope[-1] == 'continuation':
@@ -361,6 +369,9 @@ class ScopeSetter(object):
         self.new_line_parts[-1].after_bracket = self.after_bracket
         self.new_line_part = ''
 
+        if closing or self.start_of_line:
+            self.continuation = False
+
         if new_line_part.strip() or closing:
             self.start_of_statement = True
             self.start_of_line = False
@@ -368,7 +379,7 @@ class ScopeSetter(object):
 
     def parse(self):
         '''Parse the line_parts list that was set in the constructor'''
-
+        self.continuation = False
         self.start_of_statement = True
         for line_part in self.line_parts:
             self.start_of_line = line_part.start_of_line
@@ -423,15 +434,18 @@ class ScopeSetter(object):
                         self.new_line_part += char
                         self.add_line_part(True)
                     elif char == ':' and self.last_char == ')':
-                        self.add_line_part()
-                        self.start_of_statement = True
+                        self.add_line_part(True)
+                        self.add_scope('initializer list')
                         self.new_line_part += char
                         self.add_line_part()
-                        self.add_scope('initializer list')
-                        self.start_of_statement = False
+                        self.continuation = True
                     elif char == ';':
                         self.new_line_part += char
                         self.add_line_part(True)
+                    elif char == ',':
+                        self.new_line_part += char
+                        self.add_line_part(False)
+                        self.continuation = True
                     else:
                         self.new_line_part += char
 
@@ -458,6 +472,7 @@ class ScopeSetter(object):
                     # There was stuff on this line that
                     # continues on the next line
                     if new_line_part.rstrip():
+                        self.continuation = True
                         self.start_of_statement = False
             else:
                 line_part.scope = self.scope
