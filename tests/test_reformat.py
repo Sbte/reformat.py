@@ -287,6 +287,10 @@ def test_return_statement():
     out = reformat.reformat('return(a);')
     assert out == 'return (a);'
 
+def test_index():
+    out = reformat.reformat('a[i+1];')
+    assert out == 'a[i+1];'
+
 def test_namespace():
     code = '''namespace A {
 

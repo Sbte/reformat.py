@@ -84,6 +84,8 @@ class Scope(object):
             if s != 'continuation':
                 return s
 
+        return ''
+
     def set_last(self, item):
         for i in xrange(len(self)-1, -1, -1):
             if self.__getitem__(i) != 'continuation':
@@ -97,8 +99,7 @@ class StringReplacer(object):
     String = 1
     Comment = 2
     MultilineComment = 3
-    Index = 4
-    EOL = 5
+    EOL = 4
 
     def __init__(self, text, type, first = True, scope = None):
         self.text = text
@@ -113,18 +114,18 @@ class StringReplacer(object):
             self.scope = Scope(scope)
 
         self.keywords = ['for', 'if', 'while', 'return']
-        self.brackets = {'(': ')'}
+        self.brackets = {'(': ')', '[': ']'}
 
         self.indentation = ''
         if self.start_of_line:
             self.indentation = re.match('^\s*', self.text).group(0)
 
     def replace(self, search, replace):
-        if self.type in [self.Normal, self.Index]:
+        if self.type in [self.Normal]:
             self.text = self.text.replace(search, replace)
 
     def regex_replace(self, search, replace):
-        if self.type in [self.Normal, self.Index]:
+        if self.type in [self.Normal]:
             self.text = re.sub(search, replace, self.text)
 
     def repeated_replace(self, search, replace):
@@ -392,7 +393,7 @@ class ScopeSetter(object):
                         self.pop_scope()
                         self.add_scope(char)
                         self.scope_keyword = ''
-                    elif char in line_part.brackets:
+                    elif char in line_part.brackets.iterkeys():
                         self.new_line_part += char
                         self.add_line_part()
                         self.add_scope(self.scope_keyword or char)
@@ -409,7 +410,7 @@ class ScopeSetter(object):
                         self.scope_keyword = ''
                         self.new_line_part += char
                         self.add_line_part()
-                    elif char == ')':
+                    elif char in line_part.brackets.itervalues():
                         self.new_line_part += char
                         self.add_line_part()
                         if self.scope.last in line_part.keywords:
@@ -552,18 +553,6 @@ class LineSplitter(object):
                     self.current_line_part += line[pos:]
                     break
 
-                if self.current_line_part.endswith('[') and is_normal_line_type(self.line_type):
-                    self.add_line_part(StringReplacer(
-                        self.current_line_part[:-1], self.line_type[-1], self.start_of_line))
-                    self.line_type.append(StringReplacer.Index)
-                    self.current_line_part += '['
-                    continue
-
-                if self.current_line_part.endswith(']') and self.line_type[-1] == StringReplacer.Index:
-                    self.add_line_part(StringReplacer(
-                        self.current_line_part, self.line_type.pop(), self.start_of_line))
-                    continue
-
             last = self.current_line_part
             if self.current_line_part.rstrip():
                 self.add_line_part(StringReplacer(self.current_line_part.rstrip(),
@@ -586,7 +575,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
     text = ''
     pos = 0
     for line_part in line_parts:
-        if line_part.type not in [StringReplacer.Normal, StringReplacer.Index]:
+        if line_part.type not in [StringReplacer.Normal]:
             if set_indent and line_part.type not in [StringReplacer.MultilineComment]:
                 line_part.set_indenting()
 
@@ -613,7 +602,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
                 line_part.replace(op1+' '+op2, op1+op2)
 
         # Remove spaces in indices
-        if (line_part.type == StringReplacer.Index):
+        if '[' in line_part.scope.last:
             for op in ops:
                 line_part.replace(' '+op+' ', op)
 
