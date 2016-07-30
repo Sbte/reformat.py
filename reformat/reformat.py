@@ -292,7 +292,7 @@ class StringReplacer(object):
         # Class definitions (public is not indented,
         # but function definitions are)
         for s in ('class', 'struct'):
-            if s in self.scope and not self.text.rstrip() in \
+            if s in self.scope and not self.text.strip() in \
                ['private:', 'protected:', 'public:']:
                 scopes += 1
 
@@ -350,7 +350,8 @@ class ScopeSetter(object):
 
     def add_line_part(self, closing = False):
         '''Add a new line part to the new_line_parts list'''
-        if self.new_line_part == '':
+        if self.new_line_part == '' or \
+           (self.start_of_line and not self.new_line_part.strip()):
             return
 
         new_line_part = self.new_line_part
@@ -463,7 +464,7 @@ class ScopeSetter(object):
                             self.scope_keyword = keyword
 
                     for keyword in ['private', 'protected', 'public']:
-                        if re.match('^'+keyword+':$', self.new_line_part):
+                        if re.match('^\s*'+keyword+':$', self.new_line_part):
                             self.add_line_part()
                 if self.new_line_part:
                     new_line_part = self.new_line_part
@@ -483,100 +484,105 @@ class ScopeSetter(object):
 
         return self.new_line_parts
 
+class LineSplitter(object):
+    def __init__(self, text):
+        self.lines = []
+        if isinstance(text, basestring):
+            self.lines = text.splitlines(True)
+        else:
+            self.lines = text
+        self.line_type = []
+        self.line_parts = []
+        self.current_line_part = ''
+        self.start_of_line = True
+
+    def add_line_part(self, line_part):
+        if not line_part.text.strip() and not line_part.type == StringReplacer.EOL:
+            self.current_line_part = str(line_part)
+            return
+
+        self.current_line_part = ''
+        self.line_parts.append(line_part)
+        self.start_of_line = False
+
+    def parse(self):
+        self.line_type = [StringReplacer.Normal]
+
+        self.line_parts = []
+        for line_num, line in enumerate(self.lines):
+            self.current_line_part = ''
+            if self.line_type[-1] == StringReplacer.Comment:
+                self.line_type.pop()
+
+            self.start_of_line = True
+            for pos, char in enumerate(line):
+                self.current_line_part += char
+
+                if self.line_type[-1] == StringReplacer.MultilineComment:
+                    if self.current_line_part.endswith('*/'):
+                        self.add_line_part(StringReplacer(
+                            self.current_line_part, self.line_type.pop(), self.start_of_line))
+                        continue
+                    else:
+                        continue
+
+                if self.current_line_part.endswith('/*'):
+                    self.add_line_part(StringReplacer(
+                        self.current_line_part[:-2], self.line_type[-1], self.start_of_line))
+                    self.line_type.append(StringReplacer.MultilineComment)
+                    self.current_line_part += '/*'
+                    continue
+
+                if char == '"':
+                    if self.line_type[-1] == StringReplacer.String:
+                        self.add_line_part(StringReplacer(
+                            self.current_line_part, self.line_type.pop(), self.start_of_line))
+                    else:
+                        self.add_line_part(StringReplacer(
+                            self.current_line_part, self.line_type[-1], self.start_of_line))
+                        self.line_type.append(StringReplacer.String)
+                    continue
+
+                if self.current_line_part.endswith('//'):
+                    self.add_line_part(StringReplacer(
+                        self.current_line_part[:-2], self.line_type[-1], self.start_of_line))
+                    self.line_type.append(StringReplacer.Comment)
+                    self.current_line_part += line[pos-1:]
+                    break
+
+                if self.current_line_part.lstrip() == '#':
+                    self.add_line_part(StringReplacer(
+                        self.current_line_part[:-1], self.line_type[-1], self.start_of_line))
+                    self.line_type.append(StringReplacer.Comment)
+                    self.current_line_part += line[pos:]
+                    break
+
+                if self.current_line_part.endswith('[') and is_normal_line_type(self.line_type):
+                    self.add_line_part(StringReplacer(
+                        self.current_line_part[:-1], self.line_type[-1], self.start_of_line))
+                    self.line_type.append(StringReplacer.Index)
+                    self.current_line_part += '['
+                    continue
+
+                if self.current_line_part.endswith(']') and self.line_type[-1] == StringReplacer.Index:
+                    self.add_line_part(StringReplacer(
+                        self.current_line_part, self.line_type.pop(), self.start_of_line))
+                    continue
+
+            last = self.current_line_part
+            if self.current_line_part.rstrip():
+                self.add_line_part(StringReplacer(self.current_line_part.rstrip(),
+                                                  self.line_type[-1], self.start_of_line))
+            if last.endswith('\n'):
+                self.add_line_part(StringReplacer(self.current_line_part,
+                                                  StringReplacer.EOL, self.start_of_line))
+
 def reformat(text_in, base_scope=None, set_indent=False):
-    if isinstance(text_in, basestring):
-        lines = text_in.splitlines(True)
-    else:
-        lines = text_in
+    splitter = LineSplitter(text_in)
+    splitter.parse()
+    line_parts = splitter.line_parts
 
-    line_type = [StringReplacer.Normal]
-
-    line_parts = []
-    for line_num, line in enumerate(lines):
-        if set_indent and line.strip() and \
-           line_type[-1] != StringReplacer.MultilineComment:
-            line = line.lstrip()
-
-        line_part = ''
-        if line_type[-1] == StringReplacer.Comment:
-            line_type.pop()
-
-        first = True
-        for pos, char in enumerate(line):
-            line_part += char
-
-            if line_type[-1] == StringReplacer.MultilineComment:
-                if line_part.endswith('*/'):
-                    line_parts.append(StringReplacer(
-                        line_part, line_type.pop(), first))
-                    first = False
-                    line_part = ''
-                    continue
-                else:
-                    continue
-
-            if line_part.endswith('/*'):
-                if len(line_part) > 2:
-                    line_parts.append(StringReplacer(
-                        line_part[:-2], line_type[-1], first))
-                    first = False
-                line_type.append(StringReplacer.MultilineComment)
-                line_part = '/*'
-                continue
-
-            if char == '"':
-                if line_type[-1] == StringReplacer.String:
-                    line_parts.append(StringReplacer(
-                        line_part, line_type.pop(), first))
-                else:
-                    line_parts.append(StringReplacer(
-                        line_part, line_type[-1], first))
-                    line_type.append(StringReplacer.String)
-                first = False
-                line_part = ''
-                continue
-
-            if line_part.endswith('//'):
-                if len(line_part) > 2:
-                    line_parts.append(StringReplacer(
-                        line_part[:-2], line_type[-1], first))
-                    first = False
-                line_type.append(StringReplacer.Comment)
-                line_part = line[pos-1:]
-                break
-
-            if line_part.lstrip() == '#':
-                if len(line_part) > 1:
-                    line_parts.append(StringReplacer(
-                        line_part[:-1], line_type[-1], first))
-                    first = False
-                line_type.append(StringReplacer.Comment)
-                line_part = line[pos:]
-                break
-
-            if line_part.endswith('[') and is_normal_line_type(line_type):
-                line_parts.append(StringReplacer(
-                    line_part[:-1], line_type[-1], first))
-                line_type.append(StringReplacer.Index)
-                first = False
-                line_part = '['
-                continue
-
-            if line_part.endswith(']') and line_type[-1] == StringReplacer.Index:
-                line_parts.append(StringReplacer(
-                    line_part, line_type.pop(), first))
-                first = False
-                line_part = ''
-                continue
-
-        if line_part.rstrip():
-            line_parts.append(StringReplacer(line_part.rstrip(),
-                                             line_type[-1], first))
-            first = False
-        if line_part.endswith('\n'):
-            line_parts.append(StringReplacer('', StringReplacer.EOL, first))
-
-    # Check that we popped all other line_types
+    # Check that we popped all other self.line_types
     # assert line_type == [StringReplacer.Normal]
 
     set_scopes = ScopeSetter(line_parts, base_scope)

@@ -360,6 +360,8 @@ def test_multiline_comments():
     assert out == code
     out = reformat.reformat(code, set_indent=True)
     assert out == code
+    out = reformat.reformat(code, 1, set_indent=True)
+    assert out == code
 
 def test_pragma():
     code = '#pragma omp for schedule(static) reduction(+:a)'
