@@ -85,7 +85,7 @@ class Scope(object):
 
     def get_last(self):
         if not len(self):
-            return None
+            return ''
 
         for s in reversed(self):
             if s != 'continuation':
@@ -443,10 +443,9 @@ class ScopeSetter(object):
                     elif char == ';':
                         self.new_line_part += char
                         self.add_line_part(True)
-                    elif char == ',':
+                    elif char == ',' and '(' in self.scope.last:
                         self.new_line_part += char
-                        self.add_line_part(False)
-                        self.continuation = True
+                        self.add_line_part(True)
                     else:
                         self.new_line_part += char
 
