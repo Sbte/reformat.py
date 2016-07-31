@@ -3,65 +3,72 @@ import os
 import re
 
 class Scope(object):
-    def __init__(self, initial = None):
-        self.nested_list = []
-        self.length = 0
-        if initial:
-            if isinstance(initial, list):
-                self.nested_list = initial
-            elif isinstance(initial, int):
-                for i in xrange(initial):
-                    self.append('{')
-            elif isinstance(initial, Scope):
-                self.nested_list = initial.nested_list
-                self.length = initial.length
-            else:
-                self.append(initial)
+    def __init__(self, parent, item = None):
+        self.parent = None
+        self.item = None
+        if not item:
+            if isinstance(parent, int):
+                if parent > 0:
+                    self.parent = Scope(parent - 1)
+                    self.item = '{'
+            elif isinstance(parent, Scope):
+                self.parent = parent.parent
+                self.item = parent.item
+        else:
+            self.parent = parent
+            self.item = item
 
     def __len__(self):
-        return self.length
+        scope = self
+        length = 0
+        while scope.parent:
+            scope = scope.parent
+            length += 1
+        return length
+
+    def __nonzero__(self):
+        return True
 
     def __getitem__(self, index):
-        nested_list = self.nested_list
+        scope = self
 
         if index < 0:
             for i in xrange(-index):
-                item = nested_list[1]
-                nested_list = nested_list[0]
+                item = scope.item
+                scope = scope.parent
         else:
-            for i in xrange(self.length-index):
-                item = nested_list[1]
-                nested_list = nested_list[0]
+            raise IndexError('Not implemented')
 
         return item
 
     def __setitem__(self, index, item):
-        nested_list = self.nested_list
+        scope = self
 
         if index < 0:
             for i in xrange(-index-1):
-                nested_list = nested_list[0]
+                scope = scope.parent
         else:
-            for i in xrange(self.length-index-1):
-                nested_list = nested_list[0]
-        nested_list[1] = item
+            raise IndexError('Not implemented')
+        scope.item = item
 
     def __iter__(self):
-        nested_list = self.nested_list
-        for i in xrange(self.length):
-            item = nested_list[1]
-            nested_list = nested_list[0]
+        scope = self
+        while scope.parent:
+            item = scope.item
+            scope = scope.parent
             yield item
 
-    def append(self, item):
-        self.nested_list = [self.nested_list, item]
-        self.length += 1
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
 
-    def pop(self):
-        item = self.nested_list[1]
-        self.nested_list = self.nested_list[0]
-        self.length -= 1
-        return item
+    def __repr__(self):
+        return repr([self.parent, self.item])
+
+    def __contains__(self, item):
+        for i in self:
+            if item in i:
+                return True
+        return False
 
     def indented_scopes(self):
         scopes = 0
@@ -77,20 +84,22 @@ class Scope(object):
         return True
 
     def get_last(self):
-        if not len(self):
+        if not self.item:
             return ''
 
-        for s in reversed(self):
+        for s in self:
             if s != 'continuation':
                 return s
 
         return ''
 
     def set_last(self, item):
-        for i in xrange(len(self)-1, -1, -1):
-            if self.__getitem__(i) != 'continuation':
-                self.__setitem__(i, item)
+        scope = self
+        while scope.parent:
+            if scope.item != 'continuation':
+                scope.item = item
                 return
+            scope = scope.parent
 
     last = property(get_last, set_last)
 
@@ -166,7 +175,7 @@ class StringReplacer(object):
                 for b in self.brackets:
                     if b in s:
                         counts = False
-            if len(self.scope) and self.scope.last in self.keywords:
+            if self.scope.last in self.keywords:
                 counts = False
             if counts:
                 self.repeated_regex_replace(
@@ -273,7 +282,7 @@ class StringReplacer(object):
         scopes = self.scope.indented_scopes()
 
         # Align with brackets
-        for s in reversed(self.scope):
+        for s in self.scope:
             aligned = True
             for b in self.brackets:
                 if b in s:
@@ -282,7 +291,7 @@ class StringReplacer(object):
                             continue
                         self.indentation = s[b] * ' '
                         return
-                    else: 
+                    else:
                         aligned = False
                         scopes += 1
 
@@ -323,7 +332,6 @@ class ScopeSetter(object):
 
         self.scope = Scope(base_scope)
         self.base_scope = Scope(base_scope)
-        self.scopes = [self.scope]
 
         self.scope_keyword = ''
         self.last_char = ''
@@ -335,15 +343,12 @@ class ScopeSetter(object):
 
     def pop_scope(self, continuation=False):
         if not continuation and self.scope[-1] == 'continuation':
-            self.scopes.pop()
+            self.scope = self.scope.parent
 
-        self.scopes.pop()
-        self.scope = self.scopes[-1]
+        self.scope = self.scope.parent
 
     def add_scope(self, item):
-        self.scope = Scope(self.scope)
-        self.scope.append(item)
-        self.scopes.append(self.scope)
+        self.scope = Scope(self.scope, item)
 
     def add_line_part(self, closing = False):
         '''Add a new line part to the new_line_parts list'''
@@ -476,7 +481,7 @@ class ScopeSetter(object):
                 self.new_line_parts.append(line_part)
 
         # All scopes should be closed at the end of the file
-        len(self.scope) == len(self.base_scope)
+        assert self.scope == self.base_scope
 
         return self.new_line_parts
 
