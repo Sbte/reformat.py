@@ -70,6 +70,33 @@ class Scope(object):
                 return True
         return False
 
+    def remove(self, item):
+        def helper(scope):
+            '''Recursively iterates over nested lists to find the
+            deepest match. Returns after if nothing was found'''
+            while scope.parent:
+                if scope.parent and item in scope.item:
+                    if helper(scope.parent):
+                        return True
+
+                    if scope.parent.parent:
+                        scope.item = scope.parent.item
+                        scope.parent = scope.parent.parent
+                    else:
+                        scope.item = None
+                        scope.parent = None
+                    return True
+                scope = scope.parent
+            return False
+
+        scope = self
+        error = ValueError('Item \'%s\' not found in scope \'%s\'' % (item, self))
+        if not len(scope):
+            raise error
+
+        if not helper(scope):
+            raise error
+
     def indented_scopes(self):
         scopes = 0
         for s in self:
@@ -110,6 +137,9 @@ class StringReplacer(object):
     MultilineComment = 3
     EOL = 4
 
+    brackets = {'(': ')', '[': ']', '<': '>'}
+    keywords = ['for', 'if', 'while', 'return']
+
     def __init__(self, text, type, first = True, scope = None):
         self.text = text
         self.type = type
@@ -121,9 +151,6 @@ class StringReplacer(object):
             self.scope = scope
         else:
             self.scope = Scope(scope)
-
-        self.keywords = ['for', 'if', 'while', 'return']
-        self.brackets = {'(': ')', '[': ']'}
 
         self.indentation = ''
         if self.start_of_line:
@@ -198,15 +225,25 @@ class StringReplacer(object):
         # No space before a bracket
         self.repeated_regex_replace('<((?:[\w\.<>:\*& ])+?)((?:> )*)> \(', '<\g<1>\g<2>>(')
 
+        # Space after multiple closing brackets
+        if self.after_bracket:
+            self.regex_replace('^\s*>', ' >')
+
     def handle_brackets(self):
         '''Don't allow spaces before and after brackets'''
+        for lb, rb in self.brackets.iteritems():
+            if not lb in self.scope.last and \
+               not (self.scope.last in self.keywords and lb == '('):
+                continue
 
-        # Handle spaces after a bracket
-        if self.after_bracket:
-            self.regex_replace('^\s*([^\(])', ' \g<1>')
+            elb = re.escape(lb)
+            erb = re.escape(rb)
 
-        self.regex_replace('\(\s+', '(')
-        self.regex_replace('\s+\)', ')')
+            self.regex_replace('\s*'+elb+'\s*', lb)
+            self.regex_replace('\s*'+erb+'\s*', rb)
+
+        if self.after_bracket and self.start_of_statement:
+            self.text = ' ' + self.text
 
     def handle_colon(self):
         '''Handle colons at the end of the line like in public:'''
@@ -217,17 +254,16 @@ class StringReplacer(object):
         '''Handle exponents like 1.1e-1'''
         self.regex_replace('(\d*\.\d+|\d+)e ([\+\-]) (\d+)', '\g<1>e\g<2>\g<3>')
 
-    def handle_unary(self):
+    def handle_unary(self, operators=None):
         '''Handle unary operators like -1'''
-        self.regex_replace('([^\w\]\)\-]) \- ', '\g<1> -')
-        self.regex_replace('([^\w\]\)\+]) \+ ', '\g<1> +')
+        for op in operators:
+            eop = re.escape(op)
+            self.regex_replace('([^\w\]\)'+eop+']) '+eop+' ', '\g<1> '+op)
 
-        if self.start_of_statement:
-            self.regex_replace('^\s*\- ', '-')
-            self.regex_replace('^\s*\+ ', '+')
+            if self.start_of_statement:
+                self.regex_replace('^\s*'+eop+' ', op)
 
-        self.replace('return - ', 'return -')
-        self.replace('return + ', 'return +')
+            self.replace('return '+op+' ', 'return '+op)
 
         # Increment and decrement
         for op1 in ['+', '-']:
@@ -247,7 +283,7 @@ class StringReplacer(object):
     def handle_keywords(self):
         '''Spaces after keywords'''
         for key in self.keywords:
-            self.replace(key+'(', key+' (')
+            self.regex_replace(key+'$', key+' ')
 
     def handle_punctuation(self):
         '''Handle punctuation like . , ;'''
@@ -365,12 +401,26 @@ class ScopeSetter(object):
         elif closing and len(self.scope) and self.scope[-1] == 'continuation':
             self.pop_scope(True)
 
+        for keyword in ('namespace', 'class', 'struct'):
+            if re.match('^\W*'+keyword+'\W+[^;]+$', self.new_line_part) or \
+               re.match('^\W*'+keyword+'$', self.new_line_part):
+                self.scope_keyword = keyword
+
+        for keyword in StringReplacer.keywords:
+            if re.match('\W+'+keyword+'\W*$', self.new_line_part) or \
+               re.match('^'+keyword+'\W*$', self.new_line_part):
+                self.scope_keyword = keyword
 
         self.new_line_parts.append(StringReplacer(
             self.new_line_part, StringReplacer.Normal, self.start_of_line, self.scope))
         self.new_line_parts[-1].start_of_statement = self.start_of_statement
         self.new_line_parts[-1].after_bracket = self.after_bracket
         self.new_line_part = ''
+
+        if closing:
+            for b in StringReplacer.brackets:
+                while b in self.scope:
+                    self.scope.remove(b)
 
         if closing or self.start_of_line:
             self.continuation = False
@@ -398,11 +448,15 @@ class ScopeSetter(object):
                         self.pop_scope()
                         self.add_scope(char)
                         self.scope_keyword = ''
-                    elif char in line_part.brackets.iterkeys():
+                    elif char == '>' and self.new_line_part.endswith('-'):
+                        # For instance for (int i = 0; i < a->c; ++i)
                         self.new_line_part += char
+                    elif char in line_part.brackets.iterkeys():
                         self.add_line_part()
+                        self.new_line_part += char
                         self.add_scope(self.scope_keyword or char)
                         self.scope_keyword = ''
+                        self.add_line_part()
                     elif char == '{':
                         self.add_line_part(True)
                         self.new_line_part += char
@@ -415,14 +469,19 @@ class ScopeSetter(object):
                         self.scope_keyword = ''
                         self.new_line_part += char
                         self.add_line_part()
-                    elif char in line_part.brackets.itervalues():
+                    elif char == ')' and self.scope.last in line_part.keywords:
                         self.new_line_part += char
                         self.add_line_part()
-                        if self.scope.last in line_part.keywords:
-                            self.start_of_statement = True
-                        else:
-                            self.start_of_statement = False
                         self.after_bracket = True
+                        self.pop_scope()
+                        self.scope_keyword = ''
+                    elif char in line_part.brackets.get(
+                            self.scope.last, []):
+                        self.new_line_part += char
+                        self.add_line_part()
+                        self.after_bracket = True
+                        self.start_of_statement = False
+                        self.continuation = False
                         self.pop_scope()
                         self.scope_keyword = ''
                     elif len(self.scope) > 0 and \
@@ -447,22 +506,14 @@ class ScopeSetter(object):
                         self.add_line_part(True)
                     elif char == ',' and self.scope.last in line_part.brackets:
                         self.new_line_part += char
-                        self.add_line_part(True)
+                        self.add_line_part()
+                        self.start_of_statement = True
                     else:
                         self.new_line_part += char
 
                     # Store the last char to be able to detect initializer lists
                     if not re.match('\s', char):
                         self.last_char = char
-
-                    for keyword in ('namespace', 'class', 'struct'):
-                        if re.match('^\W*'+keyword+'\W$', self.new_line_part):
-                            self.scope_keyword = keyword
-
-                    for keyword in line_part.keywords:
-                        if re.match('\W+'+keyword+'\W$', self.new_line_part) or \
-                           re.match('^'+keyword+'\W$', self.new_line_part):
-                            self.scope_keyword = keyword
 
                     for keyword in ['private', 'protected', 'public']:
                         if re.match('^\s*'+keyword+':$', self.new_line_part):
@@ -480,9 +531,35 @@ class ScopeSetter(object):
                 line_part.scope = self.scope
                 self.new_line_parts.append(line_part)
 
+        for b in StringReplacer.brackets:
+            while b in self.scope:
+                self.scope.remove(b)
+
         # All scopes should be closed at the end of the file
         assert self.scope == self.base_scope
 
+        return self.new_line_parts
+
+    def merge_equal_scopes(self):
+        '''Merge line parts that have equal scopes'''
+        prev_line_part = None
+        new_line_parts = []
+        for line_part in self.new_line_parts:
+            if not prev_line_part:
+                new_line_parts.append(line_part)
+                prev_line_part = line_part
+                continue
+
+            if line_part.type == prev_line_part.type and \
+               line_part.scope == prev_line_part.scope and \
+               not line_part.type == StringReplacer.EOL:
+                prev_line_part.text += line_part.text
+                continue
+
+            new_line_parts.append(line_part)
+            prev_line_part = line_part
+
+        self.new_line_parts = new_line_parts
         return self.new_line_parts
 
 class LineSplitter(object):
@@ -576,6 +653,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
 
     set_scopes = ScopeSetter(line_parts, base_scope)
     line_parts = set_scopes.parse()
+    line_parts = set_scopes.merge_equal_scopes()
 
     text = ''
     pos = 0
@@ -624,13 +702,12 @@ def reformat(text_in, base_scope=None, set_indent=False):
 
         line_part.handle_keywords()
 
-        line_part.handle_templates()
         line_part.handle_exponent()
 
         line_part.handle_pointers('*')
         line_part.handle_pointers('&')
 
-        line_part.handle_unary()
+        line_part.handle_unary(['+', '-', '&', '*'])
 
         # Comments at the start of a line_part should stay there
         line_part.regex_replace('^ //', '//')
@@ -639,6 +716,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
             line_part.regex_replace('^\s+', '')
 
         line_part.handle_brackets()
+        line_part.handle_templates()
         line_part.handle_punctuation()
 
         # Pointer dereference ->
@@ -651,11 +729,12 @@ def reformat(text_in, base_scope=None, set_indent=False):
             if line_part.scope.last and \
                not isinstance(line_part.scope.last, dict) and \
                line_part.scope.last in line_part.brackets:
-                if line_part.start_of_line:
+                if line_part.start_of_line or \
+                   line_part.text == line_part.scope.last:
                     # Bracket at the end of the line
                     line_part.scope.last = {line_part.scope.last: -1}
                 else:
-                    line_part.scope.last = {line_part.scope.last: pos}
+                    line_part.scope.last = {line_part.scope.last: pos+1}
 
             line_part.set_indenting()
 

@@ -79,6 +79,12 @@ def test_template_arguments():
 def test_nested_template_arguments():
     out = reformat.reformat('a<b<c> > = d')
     assert out == 'a<b<c> > = d'
+    out = reformat.reformat('a<b<c> > = d', set_indent=True)
+    assert out == 'a<b<c> > = d'
+    out = reformat.reformat('a<b<c> > d')
+    assert out == 'a<b<c> > d'
+    out = reformat.reformat('a<b<c> > d', set_indent=True)
+    assert out == 'a<b<c> > d'
 
 def test_template_members():
     out = reformat.reformat('a<b>::c')
@@ -271,6 +277,8 @@ def test_for_statement():
     assert out == 'for (int i = 0; i < c; ++i)'
     out = reformat.reformat('for ( int i = 0 ; i < c ; ++i ) ')
     assert out == 'for (int i = 0; i < c; ++i)'
+    out = reformat.reformat('for ( int i = 0 ; i < a->c ; ++i ) ')
+    assert out == 'for (int i = 0; i < a->c; ++i)'
     code = '''for (int i = 0; i < c; ++i)
 {
     f();
