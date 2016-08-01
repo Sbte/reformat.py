@@ -1,2 +1,2 @@
 from .reformat import reformat
-from .reformat import Scope
+from .Scope import Scope
