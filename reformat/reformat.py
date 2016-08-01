@@ -216,15 +216,6 @@ class StringReplacer(object):
 
     def handle_templates(self):
         '''Handle C++ templates'''
-        # Templates and includes should not have spaces
-        self.repeated_regex_replace(' <\s*((?:[\w\.<>:\*& ])+?)\s*((?:> )*)>\s*', '<\g<1>\g<2>> ')
-
-        # Template members
-        self.replace('> ::', '>::')
-
-        # No space before a bracket
-        self.repeated_regex_replace('<((?:[\w\.<>:\*& ])+?)((?:> )*)> \(', '<\g<1>\g<2>>(')
-
         # Space after multiple closing brackets
         if self.after_bracket:
             self.regex_replace('^\s*>', ' >')
