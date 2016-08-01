@@ -56,10 +56,6 @@ class StringReplacer(object):
         '''Handles pointers in C-type languages'''
         escaped_pointer_type = re.escape(pointer_type)
 
-        # Pointer casts (int *) and static_cast<int *>()
-        self.regex_replace('([\(<])\s*(\w+)\s*'+escaped_pointer_type+'\s*([\)>])', '\g<1>\g<2> '+pointer_type+'\g<3>')
-        self.regex_replace('([\(<]\w+ '+escaped_pointer_type+'[\)>]) \(', '\g<1>(')
-
         # Pointers as function argument etc, like f(a, *b)
         self.regex_replace('([^\w\)]+)( )'+escaped_pointer_type+'\s*([\w\(]+)', '\g<1>\g<2>'+pointer_type+'\g<3>')
         if self.start_of_statement:
