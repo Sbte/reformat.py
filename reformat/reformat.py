@@ -20,6 +20,7 @@ class StringReplacer(object):
         self.start_of_line = first
         self.start_of_statement = first
         self.after_bracket = False
+        self.pos = 0
 
         if isinstance(scope, Scope):
             self.scope = scope
@@ -155,8 +156,22 @@ class StringReplacer(object):
         for op in ['.']:
             self.regex_replace(re.escape(op)+'\s+', op)
 
+    def set_bracket_positions(self):
+        '''Set the position of brackets in the scope'''
+        if self.type == self.Normal and self.scope.last and \
+           not isinstance(self.scope.last, dict) and \
+           self.scope.last in self.brackets:
+            if self.start_of_line or \
+               self.text == self.scope.last:
+                # Bracket at the end of the line
+                self.scope.last = {self.scope.last: -1}
+            else:
+                self.scope.last = {self.scope.last: self.pos}
+
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
+        self.set_bracket_positions()
+
         if not self.start_of_line:
             return
 
@@ -183,6 +198,8 @@ class StringReplacer(object):
                             continue
                         self.indentation = s[b] * ' '
                         return
+                    elif isinstance(s, dict) and s[b] == 0:
+                        raise ValueError('Position can\'t be 0')
                     else:
                         aligned = False
                         scopes += 1
@@ -570,24 +587,16 @@ def reformat(text_in, base_scope=None, set_indent=False):
         line_part.replace('include<', 'include <')
 
         if set_indent:
-            if line_part.scope.last and \
-               not isinstance(line_part.scope.last, dict) and \
-               line_part.scope.last in line_part.brackets:
-                if line_part.start_of_line or \
-                   line_part.text == line_part.scope.last:
-                    # Bracket at the end of the line
-                    line_part.scope.last = {line_part.scope.last: -1}
-                else:
-                    line_part.scope.last = {line_part.scope.last: pos+1}
-
+            line_part.pos = pos+1
             line_part.set_indenting()
 
-            if line_part.start_of_line:
-                pos = len(str(line_part))
-            else:
-                pos += len(str(line_part))
+        new_text = str(line_part)
+        if line_part.start_of_line:
+            pos = len(new_text)
+        else:
+            pos += len(new_text)
 
-        text += str(line_part)
+        text += new_text
 
     # Remove spaces at the end of the lines
     text = re.sub('[^\S\n]+$', '', text, flags=re.MULTILINE)
