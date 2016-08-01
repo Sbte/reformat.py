@@ -219,13 +219,6 @@ class StringReplacer(object):
     def __repr__(self):
         str(self)
 
-def is_normal_line_type(line_type):
-    normal_types = [StringReplacer.Normal]
-    if isinstance(line_type, list):
-        return line_type[-1] in normal_types
-    else:
-        return line_type in normal_types
-
 class ScopeSetter(object):
     def __init__(self, line_parts, base_scope=None):
         self.line_parts = line_parts
