@@ -597,11 +597,6 @@ def reformat(text_in, base_scope=None, set_indent=False):
     # Remove spaces at the end of the lines
     text = re.sub('[^\S\n]+$', '', text, flags=re.MULTILINE)
 
-    # Remove spaces at the start of the line that were added by us
-    ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', ':', '?']
-    for op in ops:
-        text = re.sub('^ '+re.escape(op), op, text, flags=re.MULTILINE)
-
     return text
 
 def main():
