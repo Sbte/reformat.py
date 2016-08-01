@@ -544,11 +544,6 @@ def reformat(text_in, base_scope=None, set_indent=False):
         line_part.replace('!=  ', '!= ')
         line_part.replace('  !=', ' !=')
 
-        # Remove spaces around operators
-        for op in ['->']:
-            line_part.replace(' '+op, op)
-            line_part.replace(op+' ', op)
-
         line_part.handle_keywords()
 
         line_part.handle_exponent()
