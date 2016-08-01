@@ -287,6 +287,8 @@ class ScopeSetter(object):
             for b in StringReplacer.brackets:
                 while b in self.scope:
                     self.scope.remove(b)
+            if 'initializer list' in self.scope:
+                self.scope.remove('initializer list')
 
         if closing or self.start_of_line:
             self.continuation = False
@@ -305,16 +307,7 @@ class ScopeSetter(object):
             if line_part.type == StringReplacer.Normal:
                 self.new_line_part = ''
                 for char in line_part.text:
-                    if len(self.scope) > 0 and char == '{' and \
-                       'initializer list' in self.scope:
-                        # We added a : scope that we need to remove
-                        self.add_line_part(True)
-                        self.new_line_part += char
-                        self.add_line_part(True)
-                        self.pop_scope()
-                        self.add_scope(char)
-                        self.scope_keyword = ''
-                    elif char == '>' and self.new_line_part.endswith('-'):
+                    if char == '>' and self.new_line_part.endswith('-'):
                         # For instance for (int i = 0; i < a->c; ++i)
                         self.new_line_part += char
                     elif char in line_part.brackets.iterkeys():
@@ -324,7 +317,9 @@ class ScopeSetter(object):
                         self.scope_keyword = ''
                         self.add_line_part()
                     elif char == '{':
-                        self.add_line_part(True)
+                        self.add_line_part()
+                        if self.scope.last == 'initializer list':
+                            self.pop_scope()
                         self.new_line_part += char
                         self.add_line_part(True)
                         self.add_scope(self.scope_keyword or char)
@@ -350,13 +345,6 @@ class ScopeSetter(object):
                         self.continuation = False
                         self.pop_scope()
                         self.scope_keyword = ''
-                    elif len(self.scope) > 0 and \
-                         self.scope.last == 'initializer list' and \
-                         char == ';':
-                        self.scope_keyword = ''
-                        self.new_line_part += char
-                        self.pop_scope()
-                        self.add_line_part(True)
                     elif self.scope_keyword and char == ';':
                         self.scope_keyword = ''
                         self.new_line_part += char
