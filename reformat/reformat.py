@@ -307,6 +307,10 @@ class ScopeSetter(object):
             if line_part.type == StringReplacer.Normal:
                 self.new_line_part = ''
                 for char in line_part.text:
+                    # Handle brackets that are not brackets
+                    while char == ')' and self.scope.last in line_part.brackets.iterkeys() and self.scope.last != '(':
+                        self.scope.remove(self.scope.last)
+
                     if char == '>' and self.new_line_part.endswith('-'):
                         # For instance for (int i = 0; i < a->c; ++i)
                         self.new_line_part += char

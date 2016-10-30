@@ -421,6 +421,32 @@ def test_bracket_alignment():
     out = reformat.reformat(code, 1, set_indent=True)
     assert out == code
 
+def test_curly_bracket_alignment():
+    code = '''
+    if (a)
+    {
+        if (a < b < c)c;
+        }
+
+        if (e)
+        {
+            e;
+        }'''
+
+    expected = '''
+    if (a)
+    {
+        if (a < b < c) c;
+    }
+
+    if (e)
+    {
+        e;
+    }'''
+    out = reformat.reformat(code, 1)
+    assert out == code.replace(')c', ') c')
+    out = reformat.reformat(code, 1, set_indent=True)
+    assert out == expected
 
 def test_default_values():
     code = '''f(int a = 2,
