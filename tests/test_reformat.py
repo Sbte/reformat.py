@@ -456,6 +456,17 @@ def test_default_values():
     out = reformat.reformat(code, set_indent=True)
     assert out == code
 
+def test_extra_newlines():
+    code = '''a f(a b, c d) {b; d;}'''
+    out = reformat.reformat(code, set_indent=True,
+                            extra_newlines=True)
+    expected = '''a f(a b, c d)
+{
+    b;
+    d;
+}'''
+    assert out == expected
+
 @pytest.mark.xfail
 def test_pointers_that_are_not_pointers():
     '''This is something that also doesn't work in astyle'''

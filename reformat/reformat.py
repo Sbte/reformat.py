@@ -228,12 +228,15 @@ class StringReplacer(object):
         str(self)
 
 class ScopeSetter(object):
-    def __init__(self, line_parts, base_scope=None):
+    def __init__(self, line_parts, base_scope=None, extra_newlines=False):
         self.line_parts = line_parts
         self.new_line_parts = []
 
         self.scope = Scope(base_scope)
         self.base_scope = Scope(base_scope)
+
+        self.extra_newlines = extra_newlines
+        self.extra_newline = False
 
         self.scope_keyword = ''
         self.last_char = ''
@@ -257,6 +260,8 @@ class ScopeSetter(object):
         if self.new_line_part == '' or \
            (self.start_of_line and not self.new_line_part.strip()):
             return
+
+        self.handle_extra_newlines()
 
         new_line_part = self.new_line_part
 
@@ -298,6 +303,22 @@ class ScopeSetter(object):
             self.start_of_line = False
             self.after_bracket = False
 
+    def handle_extra_newlines(self):
+        '''Add new lines that we detected but are not present'''
+        if not self.extra_newlines:
+            return
+
+        if not self.extra_newline:
+            return
+
+        if len(self.new_line_parts) and \
+           self.new_line_parts[-1].type != StringReplacer.EOL:
+            self.new_line_parts.append(StringReplacer(
+                '', StringReplacer.EOL, self.start_of_line))
+
+            self.start_of_line = True
+        self.extra_newline = False
+
     def parse(self):
         '''Parse the line_parts list that was set in the constructor'''
         self.continuation = False
@@ -325,9 +346,11 @@ class ScopeSetter(object):
                         if self.scope.last == 'initializer list':
                             self.pop_scope()
                         self.new_line_part += char
+                        self.extra_newline = True
                         self.add_line_part(True)
                         self.add_scope(self.scope_keyword or char)
                         self.scope_keyword = ''
+                        self.extra_newline = True
                     elif char == '}':
                         self.add_line_part(True)
                         self.pop_scope()
@@ -362,6 +385,8 @@ class ScopeSetter(object):
                     elif char == ';':
                         self.new_line_part += char
                         self.add_line_part(True)
+                        if not self.scope.last in line_part.keywords:
+                            self.extra_newline = True
                     elif char == ',' and self.scope.last in line_part.brackets:
                         self.new_line_part += char
                         self.add_line_part()
@@ -394,7 +419,7 @@ class ScopeSetter(object):
                 self.scope.remove(b)
 
         # All scopes should be closed at the end of the file
-        assert self.scope == self.base_scope
+        # assert self.scope == self.base_scope
 
         return self.new_line_parts
 
@@ -501,7 +526,7 @@ class LineSplitter(object):
                 self.add_line_part(StringReplacer(self.current_line_part,
                                                   StringReplacer.EOL, self.start_of_line))
 
-def reformat(text_in, base_scope=None, set_indent=False):
+def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
     splitter = LineSplitter(text_in)
     splitter.parse()
     line_parts = splitter.line_parts
@@ -509,7 +534,7 @@ def reformat(text_in, base_scope=None, set_indent=False):
     # Check that we popped all other self.line_types
     # assert line_type == [StringReplacer.Normal]
 
-    set_scopes = ScopeSetter(line_parts, base_scope)
+    set_scopes = ScopeSetter(line_parts, base_scope, extra_newlines)
     line_parts = set_scopes.parse()
     line_parts = set_scopes.merge_equal_scopes()
 
