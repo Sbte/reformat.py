@@ -17,19 +17,16 @@ class Scope(object):
     def __len__(self):
         scope = self
         length = 0
-        while scope.parent:
+        while scope.parent is not None:
             scope = scope.parent
             length += 1
         return length
-
-    def __nonzero__(self):
-        return True
 
     def __getitem__(self, index):
         scope = self
 
         if index < 0:
-            for i in xrange(-index):
+            for i in range(-index):
                 item = scope.item
                 scope = scope.parent
         else:
@@ -41,7 +38,7 @@ class Scope(object):
         scope = self
 
         if index < 0:
-            for i in xrange(-index-1):
+            for i in range(-index-1):
                 scope = scope.parent
         else:
             raise IndexError('Not implemented')
@@ -49,12 +46,14 @@ class Scope(object):
 
     def __iter__(self):
         scope = self
-        while scope.parent:
+        while scope.parent is not None:
             item = scope.item
             scope = scope.parent
             yield item
 
     def __eq__(self, other):
+        if not isinstance(other, Scope):
+            return False
         return self.__dict__ == other.__dict__
 
     def __repr__(self):
@@ -70,12 +69,12 @@ class Scope(object):
         def helper(scope):
             '''Recursively iterates over nested lists to find the
             deepest match. Returns after if nothing was found'''
-            while scope.parent:
-                if scope.parent and item in scope.item:
+            while scope.parent is not None:
+                if item in scope.item:
                     if helper(scope.parent):
                         return True
 
-                    if scope.parent.parent:
+                    if scope.parent.parent is not None:
                         scope.item = scope.parent.item
                         scope.parent = scope.parent.parent
                     else:
@@ -118,7 +117,7 @@ class Scope(object):
 
     def set_last(self, item):
         scope = self
-        while scope.parent:
+        while scope.parent is not None:
             if scope.item != 'continuation':
                 scope.item = item
                 return

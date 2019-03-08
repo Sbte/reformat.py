@@ -88,7 +88,7 @@ class StringReplacer(object):
 
     def handle_brackets(self):
         '''Don't allow spaces before and after brackets'''
-        for lb, rb in self.brackets.iteritems():
+        for lb, rb in self.brackets.items():
             if not lb in self.scope.last and \
                not (self.scope.last in self.keywords and lb == '('):
                 continue
@@ -329,13 +329,13 @@ class ScopeSetter(object):
                 self.new_line_part = ''
                 for char in line_part.text:
                     # Handle brackets that are not brackets
-                    while char == ')' and self.scope.last in line_part.brackets.iterkeys() and self.scope.last != '(':
+                    while char == ')' and self.scope.last in line_part.brackets.keys() and self.scope.last != '(':
                         self.scope.remove(self.scope.last)
 
                     if char == '>' and self.new_line_part.endswith('-'):
                         # For instance for (int i = 0; i < a->c; ++i)
                         self.new_line_part += char
-                    elif char in line_part.brackets.iterkeys():
+                    elif char in line_part.brackets.keys():
                         self.add_line_part()
                         self.new_line_part += char
                         self.add_scope(self.scope_keyword or char)
@@ -448,7 +448,7 @@ class ScopeSetter(object):
 class LineSplitter(object):
     def __init__(self, text):
         self.lines = []
-        if isinstance(text, basestring):
+        if isinstance(text, str):
             self.lines = text.splitlines(True)
         else:
             self.lines = text
@@ -622,12 +622,12 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
 
 def main():
     if len(sys.argv) < 2:
-        print 'No filename'
+        print('No filename')
         return
 
     fname = sys.argv[1]
     if not os.path.exists(fname):
-        print fname, 'is not a valid filename'
+        print(fname, 'is not a valid filename')
 
     f = open(fname, 'r')
     lines = f.readlines()
