@@ -341,6 +341,9 @@ a &f(b);'''
     code = '    // aaa:'
     out = reformat.reformat(code, 1, set_indent=True)
     assert out == code
+    code = 'a; // comment'
+    out = reformat.reformat(code, extra_newlines=True)
+    assert out == code
 
 def test_initializer_lists():
     code = '''A::A(int &a, int &b)

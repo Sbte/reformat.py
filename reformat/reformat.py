@@ -261,9 +261,9 @@ class ScopeSetter(object):
            (self.start_of_line and not self.new_line_part.strip()):
             return
 
-        self.handle_extra_newlines()
-
         new_line_part = self.new_line_part
+
+        self.handle_extra_newlines()
 
         # Add scope when a line continues from the last line
         if self.start_of_line and self.continuation and not closing and \
@@ -401,15 +401,13 @@ class ScopeSetter(object):
                     for keyword in ['private', 'protected', 'public']:
                         if re.match('^\s*'+keyword+':$', self.new_line_part):
                             self.add_line_part()
-                if self.new_line_part:
-                    new_line_part = self.new_line_part
+                if self.new_line_part.rstrip():
                     self.add_line_part()
 
                     # There was stuff on this line that
                     # continues on the next line
-                    if new_line_part.rstrip():
-                        self.continuation = True
-                        self.start_of_statement = False
+                    self.continuation = True
+                    self.start_of_statement = False
             else:
                 line_part.scope = self.scope
                 self.new_line_parts.append(line_part)
