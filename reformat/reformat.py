@@ -231,6 +231,7 @@ class ScopeSetter(object):
     def __init__(self, line_parts, base_scope=None, extra_newlines=False):
         self.line_parts = line_parts
         self.new_line_parts = []
+        self.new_line_part = ''
 
         self.scope = Scope(base_scope)
         self.base_scope = Scope(base_scope)
@@ -289,9 +290,7 @@ class ScopeSetter(object):
         self.new_line_part = ''
 
         if closing:
-            for b in StringReplacer.brackets:
-                while b in self.scope:
-                    self.scope.remove(b)
+            self.remove_bracket_scopes()
             if 'initializer list' in self.scope:
                 self.scope.remove('initializer list')
 
@@ -323,6 +322,20 @@ class ScopeSetter(object):
             self.start_of_line = True
         self.extra_newline = False
 
+    def remove_bracket_scopes(self, char = '', force = True):
+        '''Handle brackets that are not brackets. For instance
+        if (a < 0 || b > 0)
+        for (int i = 0; i < a->c; ++i)'''
+        new_line_part = self.new_line_part + char
+        if force or \
+           '||' in new_line_part or '&&' in new_line_part or \
+           '|' in new_line_part or '^' in new_line_part or \
+           new_line_part.endswith('->') or \
+           char == ')':
+            while self.scope.last in StringReplacer.brackets and \
+                  self.scope.last != '(':
+                self.scope.remove(self.scope.last)
+
     def parse(self):
         '''Parse the line_parts list that was set in the constructor'''
         self.continuation = False
@@ -332,14 +345,9 @@ class ScopeSetter(object):
             if line_part.type == StringReplacer.Normal:
                 self.new_line_part = ''
                 for char in line_part.text:
-                    # Handle brackets that are not brackets
-                    while char == ')' and self.scope.last in line_part.brackets.keys() and self.scope.last != '(':
-                        self.scope.remove(self.scope.last)
+                    self.remove_bracket_scopes(char, False)
 
-                    if char == '>' and self.new_line_part.endswith('-'):
-                        # For instance for (int i = 0; i < a->c; ++i)
-                        self.new_line_part += char
-                    elif char in line_part.brackets.keys():
+                    if char in line_part.brackets.keys():
                         self.add_line_part()
                         self.new_line_part += char
                         self.add_scope(self.scope_keyword or char)
@@ -413,9 +421,7 @@ class ScopeSetter(object):
                 line_part.scope = self.scope
                 self.new_line_parts.append(line_part)
 
-        for b in StringReplacer.brackets:
-            while b in self.scope:
-                self.scope.remove(b)
+        self.remove_bracket_scopes()
 
         # All scopes should be closed at the end of the file
         # assert self.scope == self.base_scope

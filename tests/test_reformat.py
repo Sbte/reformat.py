@@ -269,6 +269,8 @@ def test_if_statement():
     assert out == 'if (a != b) c;'
     out = reformat.reformat('if (a) * b = c;', 1)
     assert out == 'if (a) *b = c;'
+    out = reformat.reformat('if (a < 0 || b > 0) *b = c;', 1)
+    assert out == 'if (a < 0 || b > 0) *b = c;'
 
 def test_for_statement():
     out = reformat.reformat('for(int i=0;i<c;++i) a;')
@@ -350,6 +352,18 @@ def test_return_statement():
 def test_index():
     out = reformat.reformat('a[i+1];')
     assert out == 'a[i+1];'
+    out = reformat.reformat('a[b->idx];')
+    assert out == 'a[b->idx];'
+    out = reformat.reformat('a[idx(b)];')
+    assert out == 'a[idx(b)];'
+    out = reformat.reformat('a[idx--];')
+    assert out == 'a[idx--];'
+    out = reformat.reformat('a[idx++];')
+    assert out == 'a[idx++];'
+    out = reformat.reformat('a[--idx];')
+    assert out == 'a[--idx];'
+    out = reformat.reformat('a[++idx];')
+    assert out == 'a[++idx];'
 
 def test_namespace():
     code = '''namespace A {
