@@ -288,6 +288,58 @@ a = g();'''
     assert out == code
     out = reformat.reformat(code, set_indent=True)
     assert out == code
+    code = '''for (int i = 0; i < c; ++i)
+    f();
+a = g();'''
+    out = reformat.reformat(code)
+    assert out == code
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
+    code = '''for (int i = 0; i < c; ++i) f();
+a = g();'''
+    out = reformat.reformat(code)
+    assert out == code
+    out = reformat.reformat(code, set_indent=True, extra_newlines=True)
+    assert out == code
+
+def test_nested_for():
+    code = '''for (int i = 0; i < c; ++i)
+    for (int j = 0; j < c; ++j)
+    {
+        f();
+    }
+a = g();'''
+    out = reformat.reformat(code, set_indent=True)
+    code = '''for (int i = 0; i < c; ++i)
+{
+    for (int j = 0; j < c; ++j)
+    {
+        f();
+    }
+}
+a = g();'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
+    code = '''for (int i = 0; i < c; ++i)
+    for (int j = 0; j < c; ++j)
+        f();
+a = g();'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
+    code = '''for (int i = 0; i < c; ++i)
+    if (b < c)
+        f();
+a = g();'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
+    code = '''for (int i = 0; i < c; ++i)
+    for (int j = 0; j < c; ++j)
+    {
+        f();
+    }
+a = g();'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
 
 def test_return_statement():
     out = reformat.reformat('return a;')

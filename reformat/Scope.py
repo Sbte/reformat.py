@@ -95,7 +95,7 @@ class Scope(object):
     def indented_scopes(self):
         scopes = 0
         for s in self:
-            if s in ['{', 'continuation']:
+            if s in ['{', 'continuation', 'flow']:
                 scopes += 1
         return scopes
 

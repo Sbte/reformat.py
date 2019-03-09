@@ -295,6 +295,10 @@ class ScopeSetter(object):
             if 'initializer list' in self.scope:
                 self.scope.remove('initializer list')
 
+        if closing and new_line_part.strip() != '{':
+            while self.scope.last == 'flow':
+                self.pop_scope()
+
         if closing or self.start_of_line:
             self.continuation = False
 
@@ -343,7 +347,7 @@ class ScopeSetter(object):
                         self.add_line_part()
                     elif char == '{':
                         self.add_line_part()
-                        if self.scope.last == 'initializer list':
+                        if self.scope.last in ['initializer list', 'flow']:
                             self.pop_scope()
                         self.new_line_part += char
                         self.extra_newline = True
@@ -356,12 +360,13 @@ class ScopeSetter(object):
                         self.pop_scope()
                         self.scope_keyword = ''
                         self.new_line_part += char
-                        self.add_line_part()
+                        self.add_line_part(True)
                     elif char == ')' and self.scope.last in line_part.keywords:
                         self.new_line_part += char
                         self.add_line_part()
                         self.after_bracket = True
                         self.pop_scope()
+                        self.add_scope('flow')
                         self.scope_keyword = ''
                     elif char in line_part.brackets.get(
                             self.scope.last, []):
@@ -372,10 +377,6 @@ class ScopeSetter(object):
                         self.continuation = False
                         self.pop_scope()
                         self.scope_keyword = ''
-                    elif self.scope_keyword and char == ';':
-                        self.scope_keyword = ''
-                        self.new_line_part += char
-                        self.add_line_part(True)
                     elif char == ':' and self.last_char == ')':
                         self.add_line_part(True)
                         self.add_scope('initializer list')
