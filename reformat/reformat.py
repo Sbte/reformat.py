@@ -258,13 +258,14 @@ class ScopeSetter(object):
 
     def add_line_part(self, closing = False):
         '''Add a new line part to the new_line_parts list'''
+
+        self.handle_extra_newlines()
+
         if self.new_line_part == '' or \
            (self.start_of_line and not self.new_line_part.strip()):
             return
 
         new_line_part = self.new_line_part
-
-        self.handle_extra_newlines()
 
         # Add scope when a line continues from the last line
         if self.start_of_line and self.continuation and not closing and \
@@ -643,7 +644,7 @@ def main():
         f.write(''.join(lines))
         f.close()
 
-    text = reformat(lines, set_indent=True)
+    text = reformat(lines, set_indent=True, extra_newlines=True)
 
     f = open(fname, 'w')
     f.write(text)

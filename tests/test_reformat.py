@@ -348,6 +348,12 @@ def test_return_statement():
     assert out == 'return a;'
     out = reformat.reformat('return(a);')
     assert out == 'return (a);'
+    out = reformat.reformat('int f() { return 1; }',
+                            set_indent=True, extra_newlines=True)
+    assert out == '''int f()
+{
+    return 1;
+}'''
 
 def test_index():
     out = reformat.reformat('a[i+1];')
