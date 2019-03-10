@@ -46,9 +46,13 @@ def test_increment_operator():
 def test_bitshift_operator():
     out = reformat.reformat('a>>b')
     assert out == 'a >> b'
-
     out = reformat.reformat('a<<b')
     assert out == 'a << b'
+    code = '''std::cout << "test" <<
+    "test 2" << "test 3" <<
+    "test 4" << std::endl;'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
 
 def test_less_than_operator():
     out = reformat.reformat('a<b')

@@ -20,6 +20,7 @@ class StringReplacer(object):
         self.start_of_line = first
         self.start_of_statement = first
         self.after_bracket = False
+        self.continuation = False
         self.pos = 0
 
         if isinstance(scope, Scope):
@@ -211,6 +212,9 @@ class StringReplacer(object):
                ['private:', 'protected:', 'public:']:
                 scopes += 1
 
+        if self.continuation:
+            scopes += 1
+
         scopes -= self.text.strip() == ':' and \
                   self.scope.last == 'initializer list'
 
@@ -247,10 +251,7 @@ class ScopeSetter(object):
         self.after_bracket = False
         self.continuation = False
 
-    def pop_scope(self, continuation=False):
-        if not continuation and self.scope[-1] == 'continuation':
-            self.scope = self.scope.parent
-
+    def pop_scope(self):
         self.scope = self.scope.parent
 
     def add_scope(self, item):
@@ -267,12 +268,7 @@ class ScopeSetter(object):
 
         new_line_part = self.new_line_part
 
-        # Add scope when a line continues from the last line
-        if self.start_of_line and self.continuation and not closing and \
-           (not len(self.scope) or self.scope[-1] != 'continuation'):
-            self.add_scope('continuation')
-        elif closing and len(self.scope) and self.scope[-1] == 'continuation':
-            self.pop_scope(True)
+        print(new_line_part, self.scope)
 
         for keyword in ('namespace', 'class', 'struct'):
             if re.match('^\W*'+keyword+'\W+[^;]+$', self.new_line_part) or \
@@ -284,10 +280,14 @@ class ScopeSetter(object):
                re.match('^'+keyword+'\W*$', self.new_line_part):
                 self.scope_keyword = keyword
 
+        if closing:
+            self.continuation = False
+
         self.new_line_parts.append(StringReplacer(
             self.new_line_part, StringReplacer.Normal, self.start_of_line, self.scope))
         self.new_line_parts[-1].start_of_statement = self.start_of_statement
         self.new_line_parts[-1].after_bracket = self.after_bracket
+        self.new_line_parts[-1].continuation = self.continuation
         self.new_line_part = ''
 
         if closing:
@@ -295,12 +295,12 @@ class ScopeSetter(object):
             if 'initializer list' in self.scope:
                 self.scope.remove('initializer list')
 
+        if self.start_of_line:
+            self.continuation = False
+
         if closing and new_line_part.strip() != '{':
             while self.scope.last == 'flow':
                 self.pop_scope()
-
-        if closing or self.start_of_line:
-            self.continuation = False
 
         if new_line_part.strip() or closing:
             self.start_of_statement = True
