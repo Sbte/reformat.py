@@ -95,7 +95,7 @@ class Scope(object):
     def indented_scopes(self):
         scopes = 0
         for s in self:
-            if s in ['{', 'continuation', 'flow']:
+            if s in ['{', 'flow']:
                 scopes += 1
         return scopes
 
@@ -109,18 +109,9 @@ class Scope(object):
         if not self.item:
             return ''
 
-        for s in self:
-            if s != 'continuation':
-                return s
-
-        return ''
+        return self.item
 
     def set_last(self, item):
-        scope = self
-        while scope.parent is not None:
-            if scope.item != 'continuation':
-                scope.item = item
-                return
-            scope = scope.parent
+        self.item = item
 
     last = property(get_last, set_last)
