@@ -77,6 +77,8 @@ def test_template_arguments():
     assert out == 'a<b *> = c'
     out = reformat.reformat('a<b &> = c')
     assert out == 'a<b &> = c'
+    out = reformat.reformat('a = dynamic_cast<const b &>(c);')
+    assert out == 'a = dynamic_cast<const b &>(c);'
     out = reformat.reformat('a<const b> = c')
     assert out == 'a<const b> = c'
 
