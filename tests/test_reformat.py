@@ -250,7 +250,8 @@ public:
 
 def test_inheritance():
     code = '''class A : public B,
-    public C
+    public C,
+    public D
 {
 public:
     A f(int const &a, int const &b);
@@ -484,6 +485,15 @@ def test_bracket_alignment():
         a,
         b,
         c)'''
+    out = reformat.reformat(code, 1)
+    assert out == code
+    out = reformat.reformat(code, 1, set_indent=True)
+    assert out == code
+    code = '''
+    f(
+        A<B> a,
+        A<B> b,
+        A<B> c)'''
     out = reformat.reformat(code, 1)
     assert out == code
     out = reformat.reformat(code, 1, set_indent=True)

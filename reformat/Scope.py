@@ -2,8 +2,11 @@ class Scope(object):
     def __init__(self, parent, item = None):
         self.parent = None
         self.item = None
-        self.indentation = 0
+
+        self._indentation = 0
         self.position = 0
+        self.continuation = False
+
         if not item:
             if isinstance(parent, int):
                 if parent > 0:
@@ -117,3 +120,11 @@ class Scope(object):
         self.item = item
 
     last = property(get_last, set_last)
+
+    def get_indentation(self):
+        return self._indentation + self.continuation
+
+    def set_indentation(self, indentation):
+        self._indentation = indentation
+
+    indentation = property(get_indentation, set_indentation)

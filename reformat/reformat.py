@@ -176,9 +176,6 @@ class StringReplacer(object):
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
 
-        if self.start_of_line and not self.continuation:
-            self.scope.indentation = 0
-
         self.set_bracket_positions()
 
         if not self.start_of_line:
@@ -199,8 +196,7 @@ class StringReplacer(object):
             self.indentation = ' ' * self.scope.position
             return
 
-        if self.continuation:
-            self.scope.indentation += 1
+        self.scope.continuation = self.continuation
 
         scopes = self.scope.indented_scopes()
 
