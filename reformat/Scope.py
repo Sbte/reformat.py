@@ -2,6 +2,8 @@ class Scope(object):
     def __init__(self, parent, item = None):
         self.parent = None
         self.item = None
+        self.indentation = 0
+        self.position = 0
         if not item:
             if isinstance(parent, int):
                 if parent > 0:
@@ -95,9 +97,9 @@ class Scope(object):
     def indented_scopes(self):
         scopes = 0
         for s in self:
-            if s in ['{', 'flow']:
+            if s in ['{', 'flow', 'initializer list']:
                 scopes += 1
-        return scopes
+        return scopes + self.indentation
 
     def is_global(self):
         for s in self:

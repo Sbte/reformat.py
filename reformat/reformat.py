@@ -21,7 +21,7 @@ class StringReplacer(object):
         self.start_of_statement = first
         self.after_bracket = False
         self.continuation = False
-        self.pos = 0
+        self.position = 0
 
         if isinstance(scope, Scope):
             self.scope = scope
@@ -160,17 +160,25 @@ class StringReplacer(object):
     def set_bracket_positions(self):
         '''Set the position of brackets in the scope'''
         if self.type == self.Normal and self.scope.last and \
-           not isinstance(self.scope.last, dict) and \
+           self.scope.indentation == 0 and \
+           self.scope.position == 0 and \
            self.scope.last in self.brackets:
             if self.start_of_line or \
                self.text == self.scope.last:
                 # Bracket at the end of the line
-                self.scope.last = {self.scope.last: -1}
+                indentation = 1
+                if self.scope.parent:
+                    indentation += self.scope.parent.indentation
+                self.scope.indentation = indentation
             else:
-                self.scope.last = {self.scope.last: self.pos}
+                self.scope.position = self.position
 
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
+
+        if self.start_of_line and not self.continuation:
+            self.scope.indentation = 0
+
         self.set_bracket_positions()
 
         if not self.start_of_line:
@@ -187,23 +195,14 @@ class StringReplacer(object):
             self.indentation = ''
             return
 
-        scopes = self.scope.indented_scopes()
+        if self.scope.position:
+            self.indentation = ' ' * self.scope.position
+            return
 
-        # Align with brackets
-        for s in self.scope:
-            aligned = True
-            for b in self.brackets:
-                if b in s:
-                    if isinstance(s, dict) and s[b] > 0:
-                        if not aligned:
-                            continue
-                        self.indentation = s[b] * ' '
-                        return
-                    elif isinstance(s, dict) and s[b] == 0:
-                        raise ValueError('Position can\'t be 0')
-                    else:
-                        aligned = False
-                        scopes += 1
+        if self.continuation:
+            self.scope.indentation += 1
+
+        scopes = self.scope.indented_scopes()
 
         # Class definitions (public is not indented,
         # but function definitions are)
@@ -211,9 +210,6 @@ class StringReplacer(object):
             if s in self.scope and not self.text.strip() in \
                ['private:', 'protected:', 'public:']:
                 scopes += 1
-
-        if self.continuation:
-            scopes += 1
 
         scopes -= self.text.strip() == ':' and \
                   self.scope.last == 'initializer list'
@@ -267,8 +263,6 @@ class ScopeSetter(object):
             return
 
         new_line_part = self.new_line_part
-
-        print(new_line_part, self.scope)
 
         for keyword in ('namespace', 'class', 'struct'):
             if re.match('^\W*'+keyword+'\W+[^;]+$', self.new_line_part) or \
@@ -391,7 +385,6 @@ class ScopeSetter(object):
                         self.add_scope('initializer list')
                         self.new_line_part += char
                         self.add_line_part()
-                        self.continuation = True
                     elif char == ';':
                         self.new_line_part += char
                         self.add_line_part(True)
@@ -416,7 +409,8 @@ class ScopeSetter(object):
 
                     # There was stuff on this line that
                     # continues on the next line
-                    self.continuation = True
+                    if self.scope.last != 'initializer list':
+                        self.continuation = True
                     self.start_of_statement = False
             else:
                 line_part.scope = self.scope
@@ -610,7 +604,7 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
         line_part.replace('include<', 'include <')
 
         if set_indent:
-            line_part.pos = pos+1
+            line_part.position = pos+1
             line_part.set_indenting()
 
         new_text = str(line_part)

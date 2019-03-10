@@ -471,6 +471,13 @@ def test_bracket_alignment():
     out = reformat.reformat(code, 1)
     assert out == code
     out = reformat.reformat(code, 1, set_indent=True)
+    code2 = '''
+    f(a,
+  b,
+  c)'''
+    out = reformat.reformat(code2, 1)
+    assert out == code2
+    out = reformat.reformat(code2, 1, set_indent=True)
     assert out == code
     code = '''
     f(
