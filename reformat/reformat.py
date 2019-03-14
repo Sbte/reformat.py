@@ -20,6 +20,7 @@ class StringReplacer(object):
         self.type = type
         self.start_of_line = first
         self.start_of_statement = first
+        self.end_of_statement = False
         self.after_bracket = False
         self.continuation = False
 
@@ -161,7 +162,6 @@ class StringReplacer(object):
         '''Set the position of brackets in the scope'''
         if self.type == self.Normal and self.scope.last and \
            self.scope.indentation == 0 and \
-           self.scope.position == 0 and \
            self.scope.last in self.brackets:
             if self.text == self.scope.last:
                 # Bracket at the end of the line
@@ -173,11 +173,12 @@ class StringReplacer(object):
                 self.scope.position = self.scope.alignment[self.scope.last] + 1
         if self.type == self.Normal and \
            self.scope.indentation == 0 and \
-           self.scope.position == 0 and \
            self.start_of_line:
             for item in self.scope.alignment.keys():
                 if self.text.lstrip().startswith(item):
                     self.scope.position = self.scope.alignment[item]
+        if self.end_of_statement:
+            self.scope.alignment = {}
 
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
@@ -200,6 +201,7 @@ class StringReplacer(object):
 
         if self.scope.position:
             self.indentation = ' ' * self.scope.position
+            self.scope.position = 0
             return
 
         self.scope.continuation = self.continuation
@@ -282,6 +284,7 @@ class ScopeSetter(object):
         self.new_line_parts.append(StringReplacer(
             self.new_line_part, StringReplacer.Normal, self.start_of_line, self.scope))
         self.new_line_parts[-1].start_of_statement = self.start_of_statement
+        self.new_line_parts[-1].end_of_statement = closing
         self.new_line_parts[-1].after_bracket = self.after_bracket
         self.new_line_parts[-1].continuation = self.continuation
         self.new_line_part = ''
@@ -429,19 +432,28 @@ class ScopeSetter(object):
         '''Merge line parts that have equal scopes'''
         prev_line_part = None
         new_line_parts = []
+        scopes = {}
         for line_part in self.new_line_parts:
+
+            scope_len = len(line_part.scope)
+            if scope_len in scopes and \
+               line_part.scope == scopes[scope_len]:
+                line_part.scope = scopes[scope_len]
+            else:
+                scopes[scope_len] = line_part.scope
+            if scope_len+1 in scopes:
+                del scopes[scope_len+1]
+
             if not prev_line_part:
                 new_line_parts.append(line_part)
                 prev_line_part = line_part
                 continue
 
-            if line_part.scope == prev_line_part.scope:
-                line_part.scope = prev_line_part.scope
-
             if line_part.type == prev_line_part.type and \
                line_part.scope == prev_line_part.scope and \
                not line_part.type == StringReplacer.EOL:
                 prev_line_part.text += line_part.text
+                prev_line_part.end_of_statement = line_part.end_of_statement
                 continue
 
             new_line_parts.append(line_part)

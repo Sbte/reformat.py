@@ -54,10 +54,20 @@ def test_bitshift_operator():
     out = reformat.reformat(code, set_indent=True)
     assert out == code
     code = '''std::cout << "test"
-          << "test 2" << "test 3"
+          << f("test 2") << "test 3"
           << "test 4" << std::endl;'''
     out = reformat.reformat(code, set_indent=True)
     assert out == code
+    code = '''std::cout<<"test"
+<<f("test 2")<<"test 3";
+out2<<"test"
+<<f("test 2")<<"test 3";'''
+    code2 = '''std::cout << "test"
+          << f("test 2") << "test 3";
+out2 << "test"
+     << f("test 2") << "test 3";'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code2
 
 def test_less_than_operator():
     out = reformat.reformat('a<b')
