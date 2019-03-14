@@ -163,7 +163,6 @@ class StringReplacer(object):
            self.scope.indentation == 0 and \
            self.scope.position == 0 and \
            self.scope.last in self.brackets:
-            print('hello')
             if self.text == self.scope.last:
                 # Bracket at the end of the line
                 indentation = 1
@@ -172,18 +171,13 @@ class StringReplacer(object):
                 self.scope.indentation = indentation
             elif self.scope.last in self.scope.alignment:
                 self.scope.position = self.scope.alignment[self.scope.last] + 1
-            print(self.scope.position)
-            print(self.scope.indentation)
-            # return
-        # elif self.type == self.Normal and \
-        #      self.scope.indentation == 0 and \
-        #      self.scope.position == 0:
-        #     for item in self.scope.alignment.keys():
-        #         if self.text.startswith(item):
-        #             self.scope.indentation = self.scope.alignment[item]
-        #             return
-        # if self.start_of_statement:
-        #     self.scope.indentation = 0
+        if self.type == self.Normal and \
+           self.scope.indentation == 0 and \
+           self.scope.position == 0 and \
+           self.start_of_line:
+            for item in self.scope.alignment.keys():
+                if self.text.lstrip().startswith(item):
+                    self.scope.position = self.scope.alignment[item]
 
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
@@ -441,6 +435,9 @@ class ScopeSetter(object):
                 prev_line_part = line_part
                 continue
 
+            if line_part.scope == prev_line_part.scope:
+                line_part.scope = prev_line_part.scope
+
             if line_part.type == prev_line_part.type and \
                line_part.scope == prev_line_part.scope and \
                not line_part.type == StringReplacer.EOL:
@@ -548,7 +545,6 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
 
     text = ''
     pos = 0
-    alignment = {}
     for line_part in line_parts:
         if line_part.type not in [StringReplacer.Normal]:
             if set_indent and line_part.type not in [StringReplacer.MultilineComment]:
@@ -613,24 +609,13 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
         line_part.replace('include<', 'include <')
 
         if set_indent:
-            print('1', str(line_part))
-            print(alignment)
-            # for key, value in alignment.items():
-            #     if key not in line_part.scope.alignment:
-            #         line_part.scope.alignment[key] = value
             line_part.set_indenting()
-            print('2', str(line_part))
 
         if line_part.start_of_line:
             pos = 0
-        # if line_part.start_of_statement:
-        #     alignment = {}
 
         new_text = str(line_part)
         for item in line_part.alignments:
-            # if item in new_text and item not in line_part.scope.alignment.keys():
-            # if item in new_text:
-                # alignment[item] = pos + new_text.find(item)
             if item in new_text and item not in line_part.scope.alignment:
                 line_part.scope.alignment[item] = pos + new_text.find(item)
         pos += len(new_text)
