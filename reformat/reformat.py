@@ -178,8 +178,8 @@ class StringReplacer(object):
                 if self.text.lstrip().startswith(item):
                     self.scope.position = self.scope.alignment[item]
 
-    def set_indenting(self):
-        '''Set the indenting of the line part based on the scope'''
+    def set_indentation(self):
+        '''Set the indentation of the line part based on the scope'''
 
         self.handle_alignment()
 
@@ -558,7 +558,7 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
     for line_part in line_parts:
         if line_part.type not in [StringReplacer.Normal]:
             if set_indent and line_part.type not in [StringReplacer.MultilineComment]:
-                line_part.set_indenting()
+                line_part.set_indentation()
 
             text += str(line_part)
             continue
@@ -619,7 +619,7 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
         line_part.replace('include<', 'include <')
 
         if set_indent:
-            line_part.set_indenting()
+            line_part.set_indentation()
 
         if line_part.start_of_line:
             pos = 0
