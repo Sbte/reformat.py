@@ -540,17 +540,17 @@ class LineSplitter(object):
             if last.endswith('\n'):
                 self.add_line_part(StringReplacer(self.current_line_part,
                                                   StringReplacer.EOL, self.start_of_line))
+        return self.line_parts
 
 def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
     splitter = LineSplitter(text_in)
-    splitter.parse()
-    line_parts = splitter.line_parts
+    line_parts = splitter.parse()
 
     # Check that we popped all other self.line_types
     # assert line_type == [StringReplacer.Normal]
 
     set_scopes = ScopeSetter(line_parts, base_scope, extra_newlines)
-    line_parts = set_scopes.parse()
+    set_scopes.parse()
     line_parts = set_scopes.merge_equal_scopes()
 
     text = ''
