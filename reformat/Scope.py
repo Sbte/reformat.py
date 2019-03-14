@@ -5,6 +5,7 @@ class Scope(object):
 
         self._indentation = 0
         self.position = 0
+        self.alignment = {}
         self.continuation = False
 
         if not item:

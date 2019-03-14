@@ -13,6 +13,7 @@ class StringReplacer(object):
 
     brackets = {'(': ')', '[': ']', '<': '>'}
     keywords = ['for', 'if', 'while', 'return']
+    alignments = ['(', '[', '<', '<<', '>>']
 
     def __init__(self, text, type, first = True, scope = None):
         self.text = text
@@ -21,7 +22,6 @@ class StringReplacer(object):
         self.start_of_statement = first
         self.after_bracket = False
         self.continuation = False
-        self.position = 0
 
         if isinstance(scope, Scope):
             self.scope = scope
@@ -157,26 +157,38 @@ class StringReplacer(object):
         for op in ['.']:
             self.regex_replace(re.escape(op)+'\s+', op)
 
-    def set_bracket_positions(self):
+    def handle_alignment(self):
         '''Set the position of brackets in the scope'''
         if self.type == self.Normal and self.scope.last and \
            self.scope.indentation == 0 and \
            self.scope.position == 0 and \
            self.scope.last in self.brackets:
-            if self.start_of_line or \
-               self.text == self.scope.last:
+            print('hello')
+            if self.text == self.scope.last:
                 # Bracket at the end of the line
                 indentation = 1
                 if self.scope.parent:
                     indentation += self.scope.parent.indentation
                 self.scope.indentation = indentation
-            else:
-                self.scope.position = self.position
+            elif self.scope.last in self.scope.alignment:
+                self.scope.position = self.scope.alignment[self.scope.last] + 1
+            print(self.scope.position)
+            print(self.scope.indentation)
+            # return
+        # elif self.type == self.Normal and \
+        #      self.scope.indentation == 0 and \
+        #      self.scope.position == 0:
+        #     for item in self.scope.alignment.keys():
+        #         if self.text.startswith(item):
+        #             self.scope.indentation = self.scope.alignment[item]
+        #             return
+        # if self.start_of_statement:
+        #     self.scope.indentation = 0
 
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
 
-        self.set_bracket_positions()
+        self.handle_alignment()
 
         if not self.start_of_line:
             return
@@ -536,6 +548,7 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
 
     text = ''
     pos = 0
+    alignment = {}
     for line_part in line_parts:
         if line_part.type not in [StringReplacer.Normal]:
             if set_indent and line_part.type not in [StringReplacer.MultilineComment]:
@@ -600,14 +613,27 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
         line_part.replace('include<', 'include <')
 
         if set_indent:
-            line_part.position = pos+1
+            print('1', str(line_part))
+            print(alignment)
+            # for key, value in alignment.items():
+            #     if key not in line_part.scope.alignment:
+            #         line_part.scope.alignment[key] = value
             line_part.set_indenting()
+            print('2', str(line_part))
+
+        if line_part.start_of_line:
+            pos = 0
+        # if line_part.start_of_statement:
+        #     alignment = {}
 
         new_text = str(line_part)
-        if line_part.start_of_line:
-            pos = len(new_text)
-        else:
-            pos += len(new_text)
+        for item in line_part.alignments:
+            # if item in new_text and item not in line_part.scope.alignment.keys():
+            # if item in new_text:
+                # alignment[item] = pos + new_text.find(item)
+            if item in new_text and item not in line_part.scope.alignment:
+                line_part.scope.alignment[item] = pos + new_text.find(item)
+        pos += len(new_text)
 
         text += new_text
 
