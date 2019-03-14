@@ -68,6 +68,13 @@ out2 << "test"
      << f("test 2") << "test 3";'''
     out = reformat.reformat(code, set_indent=True)
     assert out == code2
+    code = '''
+std::cout << std::endl << "test" << std::endl;
+std::cout << "test" << "test"
+          << "test" << "test"
+          << std::endl;'''
+    out = reformat.reformat(code, set_indent=True)
+    assert out == code
 
 def test_less_than_operator():
     out = reformat.reformat('a<b')

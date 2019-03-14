@@ -177,8 +177,6 @@ class StringReplacer(object):
             for item in self.scope.alignment.keys():
                 if self.text.lstrip().startswith(item):
                     self.scope.position = self.scope.alignment[item]
-        if self.end_of_statement:
-            self.scope.alignment = {}
 
     def set_indenting(self):
         '''Set the indenting of the line part based on the scope'''
@@ -627,9 +625,12 @@ def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
             pos = 0
 
         new_text = str(line_part)
-        for item in line_part.alignments:
-            if item in new_text and item not in line_part.scope.alignment:
-                line_part.scope.alignment[item] = pos + new_text.find(item)
+        if line_part.end_of_statement:
+            line_part.scope.alignment = {}
+        else:
+            for item in line_part.alignments:
+                if item in new_text and item not in line_part.scope.alignment:
+                    line_part.scope.alignment[item] = pos + new_text.find(item)
         pos += len(new_text)
 
         text += new_text
