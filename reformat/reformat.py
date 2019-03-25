@@ -542,103 +542,118 @@ class LineSplitter(object):
                                                   StringReplacer.EOL, self.start_of_line))
         return self.line_parts
 
-def reformat(text_in, base_scope=None, set_indent=False, extra_newlines=False):
-    splitter = LineSplitter(text_in)
-    line_parts = splitter.parse()
 
-    # Check that we popped all other self.line_types
-    # assert line_type == [StringReplacer.Normal]
+class Formatter(object):
+    def __init__(self, text):
+        self.text = text
+        self.base_scope = None
+        self.set_indent = False
+        self.extra_newlines = False
 
-    set_scopes = ScopeSetter(line_parts, base_scope, extra_newlines)
-    set_scopes.parse()
-    line_parts = set_scopes.merge_equal_scopes()
+    def run(self):
+        splitter = LineSplitter(self.text)
+        line_parts = splitter.parse()
 
-    text = ''
-    pos = 0
-    for line_part in line_parts:
-        if line_part.type not in [StringReplacer.Normal]:
-            if set_indent and line_part.type not in [StringReplacer.MultilineComment]:
+        # Check that we popped all other self.line_types
+        # assert line_type == [StringReplacer.Normal]
+
+        set_scopes = ScopeSetter(line_parts, self.base_scope, self.extra_newlines)
+        set_scopes.parse()
+        line_parts = set_scopes.merge_equal_scopes()
+
+        text = ''
+        pos = 0
+        for line_part in line_parts:
+            if line_part.type not in [StringReplacer.Normal]:
+                if self.set_indent and line_part.type not in [StringReplacer.MultilineComment]:
+                    line_part.set_indentation()
+
+                text += str(line_part)
+                continue
+
+            # Put spaces around operators
+            ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', ':', '?']
+            for op in ops:
+                line_part.replace(op, ' '+op+' ')
+                line_part.replace('  '+op, ' '+op)
+                line_part.repeated_replace(op+'  ', op+' ')
+
+            # Remove spaces around ::
+            line_part.replace(' : : ', '::')
+
+            line_part.handle_colon()
+
+            line_part.handle_increment_and_decrement_operator()
+
+            # Remove spaces between things like // and ==
+            for op2 in ['=', '<', '>', '/', '&', '|']:
+                for op1 in ['=', '+', '-', '*', '/', '<', '>', '&', '|']:
+                    line_part.replace(op1+' '+op2, op1+op2)
+
+            # Remove spaces in indices
+            if '[' in line_part.scope.last:
+                for op in ops:
+                    line_part.replace(' '+op+' ', op)
+
+            # != is different because we don't want spaces around !
+            line_part.replace('! =', '!=')
+            line_part.replace('!=', ' != ')
+            line_part.replace('!=  ', '!= ')
+            line_part.replace('  !=', ' !=')
+
+            line_part.handle_keywords()
+
+            line_part.handle_exponent()
+
+            line_part.handle_pointers('*')
+            line_part.handle_pointers('&')
+
+            line_part.handle_unary(['+', '-', '&', '*'])
+
+            # Comments at the start of a line_part should stay there
+            line_part.regex_replace('^ //', '//')
+
+            if line_part.start_of_statement and not line_part.start_of_line:
+                line_part.regex_replace('^\s+', '')
+
+            line_part.handle_brackets()
+            line_part.handle_templates()
+            line_part.handle_punctuation()
+
+            # Pointer dereference ->
+            line_part.regex_replace('\s*\-\s*>\s*', '->')
+
+            # Includes should have a space
+            line_part.replace('include<', 'include <')
+
+            if self.set_indent:
                 line_part.set_indentation()
 
-            text += str(line_part)
-            continue
+            if line_part.start_of_line:
+                pos = 0
 
-        # Put spaces around operators
-        ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', ':', '?']
-        for op in ops:
-            line_part.replace(op, ' '+op+' ')
-            line_part.replace('  '+op, ' '+op)
-            line_part.repeated_replace(op+'  ', op+' ')
+            new_text = str(line_part)
+            if line_part.end_of_statement:
+                line_part.scope.alignment = {}
+            else:
+                for item in line_part.alignments:
+                    if item in new_text and item not in line_part.scope.alignment:
+                        line_part.scope.alignment[item] = pos + new_text.find(item)
+            pos += len(new_text)
 
-        # Remove spaces around ::
-        line_part.replace(' : : ', '::')
+            text += new_text
 
-        line_part.handle_colon()
+        # Remove spaces at the end of the lines
+        text = re.sub('[^\S\n]+$', '', text, flags=re.MULTILINE)
 
-        line_part.handle_increment_and_decrement_operator()
+        return text
 
-        # Remove spaces between things like // and ==
-        for op2 in ['=', '<', '>', '/', '&', '|']:
-            for op1 in ['=', '+', '-', '*', '/', '<', '>', '&', '|']:
-                line_part.replace(op1+' '+op2, op1+op2)
-
-        # Remove spaces in indices
-        if '[' in line_part.scope.last:
-            for op in ops:
-                line_part.replace(' '+op+' ', op)
-
-        # != is different because we don't want spaces around !
-        line_part.replace('! =', '!=')
-        line_part.replace('!=', ' != ')
-        line_part.replace('!=  ', '!= ')
-        line_part.replace('  !=', ' !=')
-
-        line_part.handle_keywords()
-
-        line_part.handle_exponent()
-
-        line_part.handle_pointers('*')
-        line_part.handle_pointers('&')
-
-        line_part.handle_unary(['+', '-', '&', '*'])
-
-        # Comments at the start of a line_part should stay there
-        line_part.regex_replace('^ //', '//')
-
-        if line_part.start_of_statement and not line_part.start_of_line:
-            line_part.regex_replace('^\s+', '')
-
-        line_part.handle_brackets()
-        line_part.handle_templates()
-        line_part.handle_punctuation()
-
-        # Pointer dereference ->
-        line_part.regex_replace('\s*\-\s*>\s*', '->')
-
-        # Includes should have a space
-        line_part.replace('include<', 'include <')
-
-        if set_indent:
-            line_part.set_indentation()
-
-        if line_part.start_of_line:
-            pos = 0
-
-        new_text = str(line_part)
-        if line_part.end_of_statement:
-            line_part.scope.alignment = {}
-        else:
-            for item in line_part.alignments:
-                if item in new_text and item not in line_part.scope.alignment:
-                    line_part.scope.alignment[item] = pos + new_text.find(item)
-        pos += len(new_text)
-
-        text += new_text
-
-    # Remove spaces at the end of the lines
-    text = re.sub('[^\S\n]+$', '', text, flags=re.MULTILINE)
-
-    return text
+def reformat(text, base_scope=None, set_indent=False, extra_newlines=False):
+    formatter = Formatter(text)
+    formatter.base_scope = base_scope
+    formatter.set_indent = set_indent
+    formatter.extra_newlines = extra_newlines
+    return formatter.run()
 
 def main():
     if len(sys.argv) < 2:
