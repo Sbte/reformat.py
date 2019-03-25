@@ -549,6 +549,23 @@ class Formatter(object):
         self.base_scope = None
         self.set_indent = False
         self.extra_newlines = False
+        self.pos = 0
+
+    def handle_indentation(self, line_part):
+        if self.set_indent:
+            line_part.set_indentation()
+
+        if line_part.start_of_line:
+            self.pos = 0
+
+        new_text = str(line_part)
+        if line_part.end_of_statement:
+            line_part.scope.alignment = {}
+        else:
+            for item in line_part.alignments:
+                if item in new_text and item not in line_part.scope.alignment:
+                    line_part.scope.alignment[item] = self.pos + new_text.find(item)
+        self.pos += len(new_text)
 
     def run(self):
         splitter = LineSplitter(self.text)
@@ -562,7 +579,7 @@ class Formatter(object):
         line_parts = set_scopes.merge_equal_scopes()
 
         text = ''
-        pos = 0
+        self.pos = 0
         for line_part in line_parts:
             if line_part.type not in [StringReplacer.Normal]:
                 if self.set_indent and line_part.type not in [StringReplacer.MultilineComment]:
@@ -626,22 +643,9 @@ class Formatter(object):
             # Includes should have a space
             line_part.replace('include<', 'include <')
 
-            if self.set_indent:
-                line_part.set_indentation()
+            self.handle_indentation(line_part)
 
-            if line_part.start_of_line:
-                pos = 0
-
-            new_text = str(line_part)
-            if line_part.end_of_statement:
-                line_part.scope.alignment = {}
-            else:
-                for item in line_part.alignments:
-                    if item in new_text and item not in line_part.scope.alignment:
-                        line_part.scope.alignment[item] = pos + new_text.find(item)
-            pos += len(new_text)
-
-            text += new_text
+            text += str(line_part)
 
         # Remove spaces at the end of the lines
         text = re.sub('[^\S\n]+$', '', text, flags=re.MULTILINE)
