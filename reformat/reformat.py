@@ -55,6 +55,23 @@ class StringReplacer(object):
             text = self.text
             self.regex_replace(search, replace)
 
+    def handle_operators(self, operators):
+        '''Handle standard operators like the + operator'''
+        operators.sort(key = len)
+        for op in operators:
+            if len(op) == 2:
+                self.replace(op[0]+' '+op[1], op[0]+op[1])
+            if len(op) == 3:
+                self.replace(op[0]+' '+op[1]+' '+op[2],
+                                  op[0]+op[1]+op[2])
+                self.replace(op[0]+op[1]+' '+op[2],
+                                  op[0]+op[1]+op[2])
+                self.replace(op[0]+' '+op[1]+op[2],
+                                  op[0]+op[1]+op[2])
+            self.replace(op, ' '+op+' ')
+            self.replace('  '+op, ' '+op)
+            self.repeated_replace(op+'  ', op+' ')
+
     def handle_pointers(self, pointer_type='*'):
         '''Handles pointers in C-type languages'''
         escaped_pointer_type = re.escape(pointer_type)
@@ -589,11 +606,10 @@ class Formatter(object):
                 continue
 
             # Put spaces around operators
-            ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', ':', '?']
-            for op in ops:
-                line_part.replace(op, ' '+op+' ')
-                line_part.replace('  '+op, ' '+op)
-                line_part.repeated_replace(op+'  ', op+' ')
+            ops = ['=', '+', '/', '-', '<', '>', '%', '*', '&', '|', '^', ':', '?',
+                   '<=', '>=', '==', '!=', '|=', '&=', '*=', '+=', '-=', '/=',
+                   '%=', '^=', '<<=', '>>=', '<<', '>>', '&&', '||', '//']
+            line_part.handle_operators(ops)
 
             # Remove spaces around ::
             line_part.replace(' : : ', '::')
@@ -602,21 +618,10 @@ class Formatter(object):
 
             line_part.handle_increment_and_decrement_operator()
 
-            # Remove spaces between things like // and ==
-            for op2 in ['=', '<', '>', '/', '&', '|']:
-                for op1 in ['=', '+', '-', '*', '/', '<', '>', '&', '|']:
-                    line_part.replace(op1+' '+op2, op1+op2)
-
             # Remove spaces in indices
             if '[' in line_part.scope.last:
                 for op in ops:
                     line_part.replace(' '+op+' ', op)
-
-            # != is different because we don't want spaces around !
-            line_part.replace('! =', '!=')
-            line_part.replace('!=', ' != ')
-            line_part.replace('!=  ', '!= ')
-            line_part.replace('  !=', ' !=')
 
             line_part.handle_keywords()
 

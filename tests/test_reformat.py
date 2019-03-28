@@ -27,13 +27,35 @@ def test_unary_minus_operator():
     out = reformat.reformat('return -1;')
     assert out == 'return -1;'
 
-def test_equality_operator():
+def test_two_char_operator():
     out = reformat.reformat('a==b')
     assert out == 'a == b'
-
-def test_inequality_operator():
     out = reformat.reformat('a!=b')
     assert out == 'a != b'
+    out = reformat.reformat('a<=b')
+    assert out == 'a <= b'
+    out = reformat.reformat('a>=b')
+    assert out == 'a >= b'
+    out = reformat.reformat('a&=b')
+    assert out == 'a &= b'
+    out = reformat.reformat('a^=b')
+    assert out == 'a ^= b'
+    out = reformat.reformat('a|=b')
+    assert out == 'a |= b'
+    out = reformat.reformat('a*=b')
+    assert out == 'a *= b'
+    out = reformat.reformat('a+=b')
+    assert out == 'a += b'
+    out = reformat.reformat('a-=b')
+    assert out == 'a -= b'
+    out = reformat.reformat('a%=b')
+    assert out == 'a %= b'
+
+def test_three_char_operator():
+    out = reformat.reformat('a<<=b')
+    assert out == 'a <<= b'
+    out = reformat.reformat('a>>=b')
+    assert out == 'a >>= b'
 
 def test_increment_operator():
     out = reformat.reformat('a++ - b')
@@ -80,17 +102,9 @@ def test_less_than_operator():
     out = reformat.reformat('a<b')
     assert out == 'a < b'
 
-def test_less_equal_operator():
-    out = reformat.reformat('a<=b')
-    assert out == 'a <= b'
-
 def test_greater_than_operator():
     out = reformat.reformat('a>b')
     assert out == 'a > b'
-
-def test_greater_equal_operator():
-    out = reformat.reformat('a>=b')
-    assert out == 'a >= b'
 
 def test_template_arguments():
     out = reformat.reformat('a<b> = c')
